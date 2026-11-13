@@ -19,7 +19,7 @@ Evidence tiers: **verified-here** = reproduced by the maintainers; **reported** 
 | F-009 | log-only | hypothesis | info | log only | npm 12 skips dependency install scripts with only a warning |
 | F-010 | active | verified-here | info | scan | Two different `near` CLIs exist; the Node one is installed |
 | F-011 | active | verified-here | warn | scan | Public testnet RPC is slow (several seconds per call) |
-| F-012 | active | verified-here | error | scan+explain | Tests use a crate that Cargo.toml does not declare (anyhow) |
+| F-012 | active | verified-here | error | scan+explain | Tests use a crate that Cargo.toml does not declare (commonly anyhow) |
 | F-013 | log-only | verified-here | info | log only | cargo near compiles the dependency tree twice on a cold cache |
 | F-014 | log-only | hypothesis | info | log only | Time-based contract paths in sandbox tests (untested) |
 | R-001 | historical | reported | info | scan+explain | CompilationError(PrepareError(Deserialization)) on deploy (does not reproduce on current testnet) |
@@ -226,14 +226,14 @@ Fix:
 References:
 - https://docs.near.org/api/rpc/providers
 
-## F-012: Tests use a crate that Cargo.toml does not declare (anyhow)
+## F-012: Tests use a crate that Cargo.toml does not declare (commonly anyhow)
 
 - Status: active; tier: verified-here; severity: error
 
 Sandbox tests commonly use `anyhow::Result`. If `anyhow` is not declared, the build fails with E0433 even though near-workspaces is already a dev-dependency.
 
 Evidence:
-- observed: Reproduced 2026-11-13 (macOS 15 arm64, rustc 1.100.0, cargo-near 0.23.0, near-sdk 5.30.1, node 26.12.1): sandbox tests using `anyhow::Result` failed with E0433 until `anyhow` was added to [dev-dependencies].
+- observed: Reproduced 2026-11-13 (macOS 15 arm64, rustc 1.100.0, cargo-near 0.23.0, near-sdk 5.30.1, node 26.12.1): sandbox tests using `anyhow::Result` failed with E0433 until `anyhow` was added to [dev-dependencies]. The same error reproduced again in the near-doctor demo contract (tests/smoke.rs using anyhow::Result).
 
 Fix:
 1. Add `{crate} = "1"` under [dev-dependencies] in {manifest}.

@@ -1,5 +1,11 @@
-error[E0433]: failed to resolve: use of unresolved module or unlinked crate `anyhow`
-  --> tests/sandbox.rs:39:21
-   |
-39 | async fn setup() -> anyhow::Result<Env> {
-   |                     ^^^^^^ use of unresolved module or unlinked crate `anyhow`
+   Compiling tipjar v0.1.0 (/Users/graph/near-doctor/demo/broken-contract)
+error[E0433]: cannot find module or crate `anyhow` in this scope
+ --> tests/smoke.rs:4:15
+  |
+4 | fn smoke() -> anyhow::Result<()> {
+  |               ^^^^^^ use of unresolved module or unlinked crate `anyhow`
+  |
+  = help: if you wanted to use a crate named `anyhow`, use `cargo add anyhow` to add it to your `Cargo.toml`
+
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `tipjar` (test "smoke") due to 1 previous error

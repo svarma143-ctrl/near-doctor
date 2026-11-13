@@ -5,7 +5,7 @@ import path from "node:path";
 import os from "node:os";
 import { matchSymptoms, redact } from "../src/index.mjs";
 import { DEFAULT_RULES_DIR, loadRules, validateRule } from "../src/index.mjs";
-import { rulesMarkdown } from "../src/report.mjs";
+import { renderSteps, rulesMarkdown } from "../src/report.mjs";
 import { nextRuleId, parseIssueBody, triage } from "../scripts/triage.mjs";
 import { ROOT, rules } from "./_helpers.mjs";
 
@@ -84,4 +84,18 @@ test("docs/FRICTION_LOG.md is generated from the rules and up to date", () => {
 
 test("every shipped rule passes the validator on its own", () => {
   for (const r of rules) assert.deepEqual(validateRule(r), [], r.id);
+});
+
+test("explain never prints blank placeholders, for every rule's repro output", () => {
+  for (const r of rules.filter((x) => x.symptoms)) {
+    const text = fs.readFileSync(path.join(ROOT, "fixtures", r.id, "repro.txt"), "utf8");
+    const m = matchSymptoms(text, rules).find((x) => x.rule.id === r.id);
+    assert.ok(m, r.id);
+    const steps = renderSteps(r, m.vars);
+    assert.ok(steps.length > 0, `${r.id} renders no fix steps in explain mode`);
+    for (const t of steps) {
+      assert.ok(!/\{\w+\}/.test(t), `${r.id}: unresolved placeholder in "${t}"`);
+      assert.ok(!/``|` = "| in \.$/.test(t), `${r.id}: blank placeholder in "${t}"`);
+    }
+  }
 });

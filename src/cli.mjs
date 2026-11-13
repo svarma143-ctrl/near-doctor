@@ -4,7 +4,7 @@ import path from "node:path";
 import { DEFAULT_RULES_DIR, VERSION, publicResult, runChecks } from "./engine.mjs";
 import { applyFixes } from "./fix.mjs";
 import { redact } from "./redact.mjs";
-import { formatCheck, formatExplain, formatRulesList, rulesMarkdown } from "./report.mjs";
+import { formatCheck, formatExplain, formatRulesList, renderSteps, rulesMarkdown } from "./report.mjs";
 import { loadRules, validateRules } from "./rules.mjs";
 import { matchSymptoms } from "./symptoms.mjs";
 import { makeRunner } from "./util.mjs";
@@ -152,7 +152,7 @@ export async function main(argv, io = {}) {
       if (flags.json) {
         out(
           JSON.stringify(
-            matches.map((m) => ({ id: m.rule.id, title: m.rule.title, tier: m.rule.tier, status: m.rule.status, why: m.rule.summary, fix: m.rule.fix.steps, vars: m.vars })),
+            matches.map((m) => ({ id: m.rule.id, title: m.rule.title, tier: m.rule.tier, status: m.rule.status, why: m.rule.summary, fix: renderSteps(m.rule, m.vars), vars: m.vars })),
             null,
             2,
           ) + "\n",

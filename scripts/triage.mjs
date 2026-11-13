@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_RULES_DIR, loadRules, matchSymptoms, redact, validateRule } from "../src/index.mjs";
+import { renderSteps } from "../src/report.mjs";
 
 /** Parse a GitHub issue-form body ("### Heading" sections) into { heading: text }. */
 export function parseIssueBody(body) {
@@ -63,7 +64,7 @@ export function triage(body, rules, { issue } = {}) {
   const matches = matchSymptoms(text, rules);
   if (matches.length) {
     const body = matches
-      .map((m) => `**${m.rule.id}: ${m.rule.title}** (${m.rule.tier}${m.rule.status === "historical" ? ", historical" : ""})\n\nWhy: ${m.rule.summary}\n\nFix:\n${m.rule.fix.steps.map((x, i) => `${i + 1}. ${x.replace(/\{(\w+)\}/g, (_, k) => m.vars[k] ?? "")}`).join("\n")}`)
+      .map((m) => `**${m.rule.id}: ${m.rule.title}** (${m.rule.tier}${m.rule.status === "historical" ? ", historical" : ""})\n\nWhy: ${m.rule.summary}\n\nFix:\n${renderSteps(m.rule, m.vars).map((x, i) => `${i + 1}. ${x}`).join("\n") || "See the friction log entry."}`)
       .join("\n\n---\n\n");
     return {
       action: "known",

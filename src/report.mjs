@@ -49,6 +49,18 @@ export function formatCheck(result, { color = false } = {}) {
   return out.join("\n").replace(/\n+$/, "") + "\n";
 }
 
+/**
+ * Fix steps for `explain`, where there is no project context: steps whose placeholders cannot be
+ * filled from the matched output are dropped, so users never see blanks like "in .".
+ */
+export function renderSteps(rule, vars) {
+  const unresolved = (t) => [...t.matchAll(/\{(\w+)\}/g)].some((m) => vars[m[1]] === undefined || vars[m[1]] === "");
+  const fill = (t) => t.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
+  const ok = rule.fix.steps.filter((t) => !unresolved(t)).map(fill);
+  if (ok.length) return ok;
+  return (rule.fix.explainSteps || []).filter((t) => !unresolved(t)).map(fill);
+}
+
 export function formatExplain(matches, { color = false } = {}) {
   const c = palette(color);
   const out = [];
@@ -57,7 +69,9 @@ export function formatExplain(matches, { color = false } = {}) {
     out.push(`${c.bold(r.id)}  ${r.title}  ${c.dim(`[${r.tier}${r.status === "historical" ? ", historical" : ""}]`)}`);
     if (m.vars.realError) out.push(`  Real cause in the output: ${m.vars.realError}`);
     out.push(`  Why: ${r.summary}`);
-    r.fix.steps.forEach((s, i) => out.push(`  ${i === 0 ? "Fix:" : "    "} ${s.replace(/\{(\w+)\}/g, (_, k) => m.vars[k] ?? "")}`));
+    const steps = renderSteps(r, m.vars);
+    if (steps.length) steps.forEach((t, i) => out.push(`  ${i === 0 ? "Fix:" : "    "} ${t}`));
+    else out.push("  Fix: see the friction log entry (near-doctor rules --markdown).");
     if (r.refs?.length) out.push(c.dim(`  See: ${r.refs.join(" ")}`));
     out.push("");
   }

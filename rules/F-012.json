@@ -3,7 +3,7 @@
   "severity": "error",
   "tier": "verified-here",
   "status": "active",
-  "title": "Tests use a crate that Cargo.toml does not declare (anyhow)",
+  "title": "Tests use a crate that Cargo.toml does not declare (commonly anyhow)",
   "summary": "Sandbox tests commonly use `anyhow::Result`. If `anyhow` is not declared, the build fails with E0433 even though near-workspaces is already a dev-dependency.",
   "message": "`{crate}` is used in {file}:{line} but not declared in {manifest}.",
   "detect": {
@@ -15,7 +15,7 @@
   },
   "symptoms": [
     {
-      "pattern": "use of unresolved module or unlinked crate `anyhow`"
+      "pattern": "use of unresolved module or unlinked crate `(?<crate>[\\w-]+)`"
     }
   ],
   "fix": {
@@ -28,10 +28,13 @@
       "crate": "anyhow",
       "version": "1",
       "description": "Add anyhow = \"1\" to [dev-dependencies]"
-    }
+    },
+    "explainSteps": [
+      "Declare the crate for your tests: `cargo add --dev {crate}` (or `cargo add {crate}` if non-test code uses it)."
+    ]
   },
   "refs": [],
   "evidence": {
-    "observed": "Reproduced 2026-11-13 (macOS 15 arm64, rustc 1.100.0, cargo-near 0.23.0, near-sdk 5.30.1, node 26.12.1): sandbox tests using `anyhow::Result` failed with E0433 until `anyhow` was added to [dev-dependencies]."
+    "observed": "Reproduced 2026-11-13 (macOS 15 arm64, rustc 1.100.0, cargo-near 0.23.0, near-sdk 5.30.1, node 26.12.1): sandbox tests using `anyhow::Result` failed with E0433 until `anyhow` was added to [dev-dependencies]. The same error reproduced again in the near-doctor demo contract (tests/smoke.rs using anyhow::Result)."
   }
 }
