@@ -111,3 +111,10 @@ test("historical rules stay quiet unless asked", async () => {
   const loud = await runChecks(fixtureOpts(dir, "R-001"));
   assert.equal(loud.findings.length, 1);
 });
+
+test("every scanning rule gives an agent a self-contained task", () => {
+  for (const r of rules.filter((x) => x.detect)) {
+    assert.ok(r.fix.agent && r.fix.agent.length > 40, `${r.id} needs fix.agent`);
+    assert.notEqual(r.fix.agent, r.fix.steps[0], `${r.id}: fix.agent must not just repeat the first step`);
+  }
+});

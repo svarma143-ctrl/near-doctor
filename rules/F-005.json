@@ -22,7 +22,8 @@
       "Attach explicit gas (about 60 Tgas) instead of `.max_gas()`.",
       "Call `worker.fast_forward(5)` before reading balances.",
       "Allow a small gas tolerance in balance assertions."
-    ]
+    ],
+    "agent": "In {file} at line {line}, replace `.max_gas()` with explicit gas (for example `.gas(Gas::from_tgas(60))`, importing `near_workspaces::types::Gas`), call `worker.fast_forward(5).await?` before reading balances, and allow a small gas tolerance in the balance assertions."
   },
   "refs": [],
   "evidence": {

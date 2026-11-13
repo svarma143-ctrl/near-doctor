@@ -18,7 +18,8 @@
       "type": "rustup-target-add",
       "target": "wasm32-unknown-unknown",
       "description": "Run `rustup target add wasm32-unknown-unknown`"
-    }
+    },
+    "agent": "Run `rustup target add wasm32-unknown-unknown` (or `near-doctor fix --safe`), then confirm with `rustup target list --installed`."
   },
   "refs": [
     "https://github.com/near/cargo-near/issues/439"

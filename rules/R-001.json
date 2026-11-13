@@ -35,7 +35,8 @@
       "If you see this error, build with `cargo near build` (it post-processes the wasm) and compare against a known-good example contract.",
       "On older nodes or toolchains, reports mention pinning Rust to 1.81 or running wasm-opt manually; check which node version you deploy to.",
       "The most-cited cause is the wasm module's features, not the RPC or the SDK; check how the wasm was built before changing either."
-    ]
+    ],
+    "agent": "Replace the plain `cargo build --target wasm32-unknown-unknown` in {file} at line {line} with `cargo near build non-reproducible-wasm`."
   },
   "refs": [
     "https://reddit.com/r/nearprotocol/comments/1jt9d53/anyone_having_issues_with_latest_version_near",

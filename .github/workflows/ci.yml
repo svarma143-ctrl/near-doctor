@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      # Includes the fixture gate: every rule must fire on its repro and stay silent on its control.
+      - run: npm test
+      - run: npm run log:check
+      - run: node bin/near-doctor.mjs rules --check
+      # near-doctor scans its own repo (fixtures, rules and docs are ignored via .near-doctorignore).
+      - run: node bin/near-doctor.mjs . --fail-on warn

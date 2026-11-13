@@ -25,7 +25,8 @@
     "steps": [
       "To record an expected failure use `account.signAndSendTransaction({ receiverId, actions: [actions.functionCall(...)], waitUntil: 'FINAL', throwOnFailure: false })` and inspect `status.Failure` and each `receipts_outcome[].outcome.status.Failure`.",
       "Otherwise wrap the call in try/catch and catch the exported error classes instead of parsing messages."
-    ]
+    ],
+    "agent": "In {file} at line {line}, replace the callFunction/callFunctionRaw call with `account.signAndSendTransaction({ receiverId, actions: [actions.functionCall(method, args, gas, deposit)], waitUntil: 'FINAL', throwOnFailure: false })` so a failed transaction can be inspected through `status.Failure` instead of throwing."
   },
   "refs": [
     "https://www.npmjs.com/package/near-api-js"

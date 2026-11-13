@@ -14,7 +14,8 @@
     "steps": [
       "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/latest/download/cargo-near-installer.sh | sh",
       "Verify with `cargo near --version`."
-    ]
+    ],
+    "agent": "Install cargo-near with the prebuilt installer from the fix steps, then run `cargo near --version` to confirm."
   },
   "refs": [
     "https://github.com/near/cargo-near"

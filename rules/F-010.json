@@ -14,7 +14,8 @@
     "steps": [
       "Know which CLI you are using before following a tutorial: this one is the Node `near-cli`.",
       "near-cli-rs is described as the recommended CLI for new users at https://near.cli.rs."
-    ]
+    ],
+    "agent": "No code change needed. Note that this is the Node near-cli ({version}) and follow tutorials written for it."
   },
   "refs": [
     "https://near.cli.rs/"

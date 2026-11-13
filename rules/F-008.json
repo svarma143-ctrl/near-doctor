@@ -28,7 +28,8 @@
     "steps": [
       "Create a funded testnet account: `near create-account <account-id>.testnet --useFaucet`.",
       "Deploy with `near deploy <account-id> <wasm-file>`."
-    ]
+    ],
+    "agent": "In {file} at line {line}, replace `{match}` with a deploy that takes the account id as an argument: `near create-account \"$ACCOUNT\" --useFaucet` followed by `near deploy \"$ACCOUNT\" <wasm-file>`."
   },
   "refs": [
     "https://docs.near.org/smart-contracts/release/upgrade"

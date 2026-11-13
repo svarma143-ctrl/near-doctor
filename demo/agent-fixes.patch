@@ -1,0 +1,41 @@
+diff -ruN a/scripts/deploy.sh b/scripts/deploy.sh
+--- a/scripts/deploy.sh
++++ b/scripts/deploy.sh
+@@ -1,4 +1,6 @@
+ #!/bin/sh
+-# Deploy the contract to a throwaway testnet account.
++# Deploy the contract to a testnet account: ./scripts/deploy.sh my-tipjar.testnet
+ set -e
+-near dev-deploy target/near/tipjar.wasm
++ACCOUNT="${1:?usage: deploy.sh <account-id>.testnet}"
++near create-account "$ACCOUNT" --useFaucet
++near deploy "$ACCOUNT" target/near/tipjar.wasm
+diff -ruN a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -47,7 +47,7 @@
+ 
+     /// What `who` is owed after the jar's fee.
+     pub fn amount_owed(&self, who: AccountId) -> U128 {
+-        U128(amount_owed(self.tips.get(&who).copied().unwrap_or(0), self.fee_bps))
++        U128(compute_amount_owed(self.tips.get(&who).copied().unwrap_or(0), self.fee_bps))
+     }
+ 
+     pub fn configure(
+@@ -75,7 +75,7 @@
+     }
+ }
+ 
+-fn amount_owed(gross: u128, fee_bps: u32) -> u128 {
++fn compute_amount_owed(gross: u128, fee_bps: u32) -> u128 {
+     gross - gross * fee_bps as u128 / 10_000
+ }
+ 
+@@ -85,6 +85,6 @@
+ 
+     #[test]
+     fn fee_is_deducted() {
+-        assert_eq!(amount_owed(10_000, 100), 9_900);
++        assert_eq!(compute_amount_owed(10_000, 100), 9_900);
+     }
+ }

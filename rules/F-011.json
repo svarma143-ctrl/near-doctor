@@ -18,7 +18,8 @@
       "Use client timeouts of at least {recommended} ms for public RPC calls.",
       "Issue independent reads in parallel.",
       "For anything user-facing, use a dedicated or failover RPC provider: https://docs.near.org/api/rpc/providers"
-    ]
+    ],
+    "agent": "Raise RPC client timeouts to at least {recommended} ms and issue independent reads in parallel."
   },
   "refs": [
     "https://docs.near.org/api/rpc/providers"

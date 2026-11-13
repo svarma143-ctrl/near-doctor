@@ -166,3 +166,14 @@ test("inspect reads wasm target features", async () => {
   fs.writeFileSync(bad, "not wasm");
   assert.equal((await run(["inspect", bad])).code, 2);
 });
+
+test("misplaced or extra arguments are rejected instead of silently ignored", async () => {
+  const dir = copyFixture("F-004/repro");
+  const wrong = await run([dir, "fix", "--safe"]);
+  assert.equal(wrong.code, 2);
+  assert.match(wrong.err, /did you mean `near-doctor fix <path>`/);
+  assert.ok(!fs.readFileSync(path.join(dir, "src/lib.rs"), "utf8").includes("allow(clippy"), "must not modify files");
+  const extra = await run([dir, "another-dir"]);
+  assert.equal(extra.code, 2);
+  assert.match(extra.err, /unexpected argument "another-dir"/);
+});

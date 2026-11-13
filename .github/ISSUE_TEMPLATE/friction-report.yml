@@ -1,0 +1,53 @@
+name: Friction report
+description: Something in NEAR tooling cost you time. Paste the output and it is matched against the friction log.
+title: "[friction] "
+labels: ["friction"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The fastest way: run `npx near-doctor submit --from <saved-output> --command "<what you ran>" --out report.md`.
+        It redacts keys, tokens, emails and home paths locally. Then either paste each section below, or
+        `gh issue create --label friction --title "[friction] ..." --body-file report.md` (same headings, same triage).
+
+        Please re-read everything before posting. Never paste seed phrases or private keys.
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: The exact command you ran.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Error output
+      description: The full output, not a summary. The real cause is often far above the last line.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: rustc, cargo-near, near-sdk, near-api-js, node, OS (near-doctor submit prints this).
+    validations:
+      required: true
+  - type: textarea
+    id: findings
+    attributes:
+      label: Doctor findings
+      description: Output of `near-doctor` on your project, if you ran it.
+  - type: textarea
+    id: fix
+    attributes:
+      label: What fixed it (if anything)
+      description: The change that made it work. This is what becomes the rule's fix.
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Secrets
+      options:
+        - label: I removed secrets (private keys, seed phrases, tokens) from this report.
+          required: true

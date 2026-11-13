@@ -88,6 +88,12 @@ export async function main(argv, io = {}) {
   const { flags, positionals } = parsed;
   let command = "check";
   if (positionals.length && COMMANDS.has(positionals[0])) command = positionals.shift();
+  const extra = positionals.slice(command === "submit" || command === "inspect" || command === "explain" || command === "fix" || command === "check" ? 1 : 0);
+  if (extra.length && !flags.help && !flags.version) {
+    const hint = COMMANDS.has(extra[0]) ? ` (did you mean \`near-doctor ${extra[0]} <path>\`? the command comes first)` : "";
+    err(`near-doctor: unexpected argument "${extra[0]}"${hint}\n`);
+    return 2;
+  }
   if (flags.help) command = "help";
   if (flags.version) command = "version";
   const color = !flags["no-color"] && !process.env.NO_COLOR && (io.isTTY ?? process.stdout.isTTY);
@@ -128,7 +134,10 @@ export async function main(argv, io = {}) {
   try {
     if (command === "rules") {
       if (flags.check) {
-        const problems = validateRules(rules, { fixturesDir: io.fixturesDir || path.join(rulesDir, "..", "fixtures") });
+        const fixturesDir = io.fixturesDir || path.join(rulesDir, "..", "fixtures");
+        const haveFixtures = fs.existsSync(fixturesDir);
+        if (!haveFixtures) out("note: fixtures are not shipped in the npm package; checking rule schema only\n");
+        const problems = validateRules(rules, { fixturesDir: haveFixtures ? fixturesDir : undefined });
         if (problems.length) {
           err(problems.join("\n") + "\n");
           return 1;

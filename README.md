@@ -1,0 +1,121 @@
+# near-doctor
+
+Preflight checks and an evidence-backed friction log for NEAR developers and their coding agents.
+
+NEAR work fails in the same small, expensive ways for many people: a contract that passes `cargo test` but not the
+wasm build, a script that calls a CLI command that no longer exists, a client written against an API that was removed.
+`near-doctor` scans a project for these in under a second, explains pasted error output, applies the safe fixes, and
+hands everything else to your coding agent as a precise task with a command that proves it worked.
+
+Status: hackathon prototype (NEAR HACKATHON, Open Innovation track). Not published to npm yet. Tested on macOS 15 arm64
+only. See [Limitations](#limitations).
+
+## Try it (about one minute)
+
+Requires Node 20+. The last two demo steps also need Rust and [cargo-near](https://github.com/near/cargo-near).
+
+```bash
+git clone https://github.com/svarma143-ctrl/near-doctor && cd near-doctor
+node scripts/demo.mjs
+```
+
+You should see: a deliberately broken contract (`demo/broken-contract`) produce four findings, two fixed by
+`near-doctor fix --safe`, two fixed by applying the edits an agent made from `near-doctor --json`, then a clean report,
+and finally `cargo near check` and `cargo test` passing for real. The last line is `DEMO OK`. A recorded run is in
+[docs/demo-run.txt](docs/demo-run.txt).
+
+Step by step on the broken contract:
+
+```bash
+node bin/near-doctor.mjs demo/broken-contract          # 4 findings with file:line (F-001, F-004, F-008, F-012)
+node bin/near-doctor.mjs demo/broken-contract --json   # agent-ready: task + acceptance command per finding
+node bin/near-doctor.mjs explain --from fixtures/F-003/repro.txt   # paste any tool output, get cause + fix
+node bin/near-doctor.mjs rules                         # the friction log (18 records)
+node bin/near-doctor.mjs . --net                       # also measures your public RPC latency (only network access)
+```
+
+## What it does
+
+| Command | What you get |
+| --- | --- |
+| `near-doctor [path]` | Static and environment checks, no network. Findings carry file, line, why, fix and evidence tier. |
+| `near-doctor --deep` | Also runs the real `cargo near check` and explains its output. |
+| `near-doctor explain --from FILE` | Paste output (or `--from -`); get the known cause and fix, including the real error buried in long dumps. |
+| `near-doctor fix --safe` | Applies deterministic, allowlisted fixes, then re-checks. `--dry-run` previews. |
+| `near-doctor submit` | Builds a redacted friction report (secrets, home paths, emails stripped locally) for a GitHub issue. |
+| `near-doctor inspect X.wasm` | Shows wasm sections and target features. |
+| `near-doctor rules [--markdown\|--json\|--check]` | The friction log; `--check` validates rules and fixtures. |
+
+Exit codes: 0 clean, 1 findings at or above `--fail-on` (default `error`), 2 usage error. Unknown or misplaced
+arguments are rejected, never ignored.
+
+### For coding agents
+
+`--json` gives each finding a `file`, `line`, a self-contained `agent.task` and `agent.acceptance.command`
+(`near-doctor --only F-001 --json`, expect no finding). Paste [docs/AGENTS-snippet.md](docs/AGENTS-snippet.md) into
+your `AGENTS.md` so agents run it before saying "done". Assistants often write NEAR code against APIs that no longer
+exist (near-api-js 0.x, `near dev-deploy`); F-007 and F-008 catch exactly that.
+
+## The friction log
+
+18 records in [`rules/`](rules), rendered to [docs/FRICTION_LOG.md](docs/FRICTION_LOG.md). Every record carries an
+evidence tier:
+
+- **verified-here** (13): reproduced on a Mac with rustc 1.100.0, cargo-near 0.23.0, near-sdk 5.30.1, near-api-js 7.5.3,
+  node 26, near-cli 4.0.13, with the date and result in `evidence.observed`.
+- **reported** (3): found in public issues or forums, not reproduced by us.
+- **hypothesis** (2): plausible and untested; never warns.
+
+One record shows the discipline. **R-001** (`CompilationError(PrepareError(Deserialization))`) is the most-reported
+NEAR build error (Reddit, near-sdk-rs #1035, near-workspaces-js #225, Stack Overflow). We tested it: a raw plain-cargo
+wasm with post-MVP features deployed and initialised on the sandbox and on live testnet (node 2.14.1, protocol 88). It
+does not reproduce today, so it is `historical`: it explains the error when pasted but never warns.
+
+Example, found while building a lending contract for the same hackathon: **F-001**. A helper function with the same
+name as a public `#[near]` method breaks only the wasm build. `cargo test --lib` still passed 18/18 with the bug;
+`cargo near check` reports it in seconds.
+
+## Contributing a friction record (and how agents help)
+
+1. `near-doctor submit --from out.txt --command "..." --out report.md`, then open a *Friction report* issue
+   ([form](.github/ISSUE_TEMPLATE/friction-report.yml)) or `gh issue create --label friction --body-file report.md`.
+2. A triage workflow ([`.github/workflows/triage.yml`](.github/workflows/triage.yml), script
+   [`scripts/triage.mjs`](scripts/triage.mjs)) matches the report against the log and replies with the rule, or
+   attaches a **draft rule** generated from the first error line.
+3. A maintainer reproduces it and adds fixtures. CI refuses a rule unless it fires on its `repro`, stays silent on its
+   `control`, renders its fix without blank placeholders, and (for autofixes) turns the repro green.
+
+Details in [CONTRIBUTING.md](CONTRIBUTING.md). Rules are data only: no shell commands or code. The only automatic fixes
+are three allowlisted types (add a crate-level lint allow, add a dev-dependency, `rustup target add`).
+
+## How it fits with existing tools
+
+`cargo near check` (cargo-near) already type-checks a contract under the real build environment. near-doctor wraps it
+for `--deep` and explains its errors; it does not replace it. `near/agent-skills` gives agents static guidance;
+near-doctor adds executable checks, a verified rule database and a contribution loop.
+
+## Limitations
+
+- **Scanners are lightweight, not compilers.** The Rust scanner strips comments and strings and tracks braces; it is
+  not a parser, so it can miss or misjudge unusual code (macro-generated items, `#[path]` modules). F-007 checks
+  JavaScript only (TypeScript type-only imports would be false positives).
+- **Evidence is narrow.** Verified on one machine and one set of versions. Linux, Windows, other versions, and mainnet
+  are untested. Node 20 and 22 were not run (development used Node 26).
+- **"Agents fix" is limited.** Three allowlisted autofixes plus agent-ready tasks. LLM-drafted rules are not
+  implemented; the triage script drafts rules deterministically from the first error line.
+- **CI and the triage workflow have not been run on GitHub.** The scripts behind them are tested locally; the YAML is not.
+- **Rules ship with the tool.** `--rules DIR` loads another pack, but there is no update channel yet.
+- **Not published to npm**; install from the repo. The package builds and runs when installed from a local tarball.
+- The `explain` command knows 6 error signatures. Unknown output returns exit 1 and suggests `submit`.
+- Telemetry: none. Network: none unless you pass `--net`.
+
+## Development
+
+```bash
+npm test                                   # 66 tests (+1 slow end-to-end test), including the fixture gate (every rule vs repro and control)
+npm run test:slow                          # real toolchain end to end (needs cargo + cargo-near)
+npm run log                                # regenerate docs/FRICTION_LOG.md
+node bin/near-doctor.mjs . --fail-on warn  # near-doctor scans itself (fixtures, rules and docs are ignored)
+```
+
+Zero runtime dependencies. License: MIT.

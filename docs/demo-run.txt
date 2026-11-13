@@ -1,0 +1,43 @@
+
+=== 1. near-doctor on the broken contract (exit 1: errors found)
+found: F-001, F-008, F-012, F-004
+
+=== 2. near-doctor fix --safe (deterministic fixes only)
+APPLIED  F-012  Add anyhow = "1" to [dev-dependencies]  (Cargo.toml)
+APPLIED  F-004  Add a crate-level #![allow(clippy::too_many_arguments)] to the crate root  (src/lib.rs)
+
+Re-check:
+near-doctor 0.1.0  /var/folders/d6/jjrskxsd3dq730z9z7lvcxg00000gn/T/near-doctor-demo-MXQfOB
+2 findings: 2 error, 0 warning, 0 info (77 ms)
+
+ERROR F-001  Helper function has the same name as a public #[near] method (wasm-only build error)
+      src/lib.rs:78
+      Free function `amount_owed` (line 78) collides with the public #[near] method of the same name (line 49).
+      Why:  #[near] exports every public method of a contract impl as a wasm entry point with the same name, so a free function with that name in the same module collides (E0428). The host build used by `cargo test` does not generate those exports, so unit tests still pass and the error only appears when building for wasm.
+      Fix:  Rename the free helper function `amount_owed` to something that is not a public method name (for example a `compute_` prefix) and update its call sites.
+            Use `cargo near check` in your edit loop: it reports this in seconds, while `cargo test --lib` still passes with the bug present.
+      Evidence: verified-here · https://github.com/near/cargo-near/issues/439
+
+ERROR F-008  `near dev-deploy` is used but the Node near CLI no longer has it
+      scripts/deploy.sh:4
+      `near dev-deploy` appears in scripts/deploy.sh:4; near-cli 4.0.13 (checked) has no such command.
+      Why:  Older tutorials deploy with `near dev-deploy` (or `near dev deploy`). The Node near-cli 4.0.13 command list has no such command, so scripts and instructions copied from them fail.
+      Fix:  Create a funded testnet account: `near create-account <account-id>.testnet --useFaucet`.
+            Deploy with `near deploy <account-id> <wasm-file>`.
+      Evidence: verified-here · https://docs.near.org/smart-contracts/release/upgrade
+
+=== 3. judgement fixes: apply the agent's edits (demo/agent-fixes.patch)
+patching file 'scripts/deploy.sh'
+patching file 'src/lib.rs'
+
+=== 4a. near-doctor again (expect clean, exit 0)
+near-doctor 0.1.0  /var/folders/d6/jjrskxsd3dq730z9z7lvcxg00000gn/T/near-doctor-demo-MXQfOB
+No known friction found.
+
+=== 4b. cargo near check (real)
+cargo near check: ok
+
+=== 4c. cargo test (real)
+cargo test: ok
+
+DEMO OK: broken contract -> findings -> safe fixes -> agent edits -> clean, and the real toolchain agrees
