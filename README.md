@@ -1,5 +1,7 @@
 # near-doctor
 
+[![CI](https://github.com/svarma143-ctrl/near-doctor/actions/workflows/ci.yml/badge.svg)](https://github.com/svarma143-ctrl/near-doctor/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/near-doctor)](https://www.npmjs.com/package/near-doctor) ![license](https://img.shields.io/badge/license-MIT-blue)
+
 Preflight checks and an evidence-backed friction log for NEAR developers and their coding agents.
 
 NEAR work fails in the same small, expensive ways for many people: a contract that passes `cargo test` but not the
@@ -31,6 +33,8 @@ Requires Node 20+. The last two demo steps also need Rust and [cargo-near](https
 git clone https://github.com/svarma143-ctrl/near-doctor && cd near-doctor
 node scripts/demo.mjs
 ```
+
+The same flow, paced for a screen recording (about 50 seconds, every command executed for real): `node scripts/showcase.mjs`.
 
 You should see: a deliberately broken contract (`demo/broken-contract`) produce four findings, two fixed by
 `near-doctor fix --safe`, two fixed by applying the edits an agent made from `near-doctor --json`, then a clean report,
@@ -139,10 +143,25 @@ near-doctor adds executable checks, a verified rule database and a contribution 
 - `explain` knows 6 error signatures. Unknown output returns exit 1 and suggests `submit`.
 - Telemetry: none. Network: none unless you pass `--net`.
 
+## Hackathon notes
+
+- **Track:** Open Innovation (`open`).
+- **What NEAR has to do with it:** near-doctor is developer tooling, not a contract. Its evidence comes from running the
+  NEAR toolchain (near-sdk 5.30, cargo-near 0.23, near-api-js 7.5, near-cli 4.0.13, testnet RPC). It sends no
+  transactions, holds no keys, and spent no funds, on testnet or mainnet.
+- **AI assistance:** written together with an AI coding agent (Hermes Agent by Nous Research, running a Claude model),
+  directed by the maintainer. The agent wrote most of the code and tests and ran the experiments recorded in the friction
+  log; the maintainer chose the scope and decided what shipped. The rule-matching code has no AI in it: rules are data,
+  and the merge gate is a deterministic fixture test.
+- **Libraries:** none at runtime (Node standard library only). The demo contract in `demo/broken-contract` uses near-sdk 5.30.
+- **When it was built:** 13 Nov 2026, inside the hackathon window, from an empty repository. Git history was rewritten once
+  before the first push to replace the author email, so the earliest commits share a rewrite timestamp.
+- **What is not done:** see [Limitations](#limitations).
+
 ## Development
 
 ```bash
-npm test                                   # 82 tests (1 slow end-to-end test is skipped unless NEAR_DOCTOR_SLOW=1), including the fixture gate
+npm test                                   # 84 tests (1 slow end-to-end test is skipped unless NEAR_DOCTOR_SLOW=1), including the fixture gate
 npm run verify                             # checks each README claim: 13 PASS lines with the command behind each
 npm run test:slow                          # real toolchain end to end (needs cargo + cargo-near)
 npm run log                                # regenerate docs/FRICTION_LOG.md

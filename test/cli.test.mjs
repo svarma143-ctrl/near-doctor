@@ -203,3 +203,11 @@ test("explain recognises both rustc wordings of the undeclared-crate error (F-01
     assert.match(r.out, /F-012/, f);
   }
 });
+
+test("show never prints raw {placeholders} for any rule", async () => {
+  const list = JSON.parse((await run(["rules", "--json"])).out);
+  for (const r of list) {
+    const out = (await run(["show", r.id])).out;
+    assert.ok(!/\{\w+\}/.test(out), `${r.id}: ${out.match(/\{\w+\}/)}`);
+  }
+});

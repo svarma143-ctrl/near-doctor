@@ -96,7 +96,8 @@ export function formatRuleDetail(r) {
   }
   if (r.fix?.steps?.length) {
     L.push("  Fix:");
-    r.fix.steps.forEach((s, i) => L.push(`    ${i + 1}. ${s}`));
+    // `show` has no project context, so template variables are shown as <placeholders>.
+    r.fix.steps.forEach((s, i) => L.push(`    ${i + 1}. ${s.replace(/\{(\w+)\}/g, "<$1>")}`));
     L.push("");
   }
   if (r.fix?.autofix) L.push(`  Auto-fix (near-doctor fix --safe): ${r.fix.autofix.description}`, "");
