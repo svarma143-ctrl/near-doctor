@@ -7,10 +7,23 @@ wasm build, a script that calls a CLI command that no longer exists, a client wr
 `near-doctor` scans a project for these in under a second, explains pasted error output, applies the safe fixes, and
 hands everything else to your coding agent as a precise task with a command that proves it worked.
 
-Status: hackathon prototype (NEAR HACKATHON, Open Innovation track). Not published to npm yet. Tested on macOS 15 arm64
-only. See [Limitations](#limitations).
+Status: hackathon prototype (NEAR HACKATHON, Open Innovation track), version 0.1.0. Tested on macOS 15 arm64 only.
+See [Limitations](#limitations).
 
-## Try it (about one minute)
+## Use it on your project
+
+```bash
+cd my-near-project
+npx near-doctor            # scan: findings with file, line and the first fix step
+npx near-doctor --deep     # also runs the real `cargo near check` (needs cargo-near)
+npx near-doctor fix --safe # apply the deterministic fixes
+```
+
+Needs Node 20+ and has no dependencies. To keep it installed: `npm i -g near-doctor`.
+
+## Try it on the broken demo contract (about one minute)
+
+The demo lives in the git repository, not in the npm package.
 
 Requires Node 20+. The last two demo steps also need Rust and [cargo-near](https://github.com/near/cargo-near).
 
@@ -122,7 +135,7 @@ near-doctor adds executable checks, a verified rule database and a contribution 
   implemented; the triage script drafts rules deterministically from the first error line.
 - **CI and triage have each run on GitHub.** CI is green on Node 20 and 22. The triage workflow matched a test issue to F-012 and replied (one test issue, with real rustc output). Neither has had sustained use.
 - **Rules ship with the tool.** `--rules DIR` loads another pack, but there is no update channel yet.
-- **Not published to npm**; install from the repo. The package builds and runs when installed from a local tarball.
+- **The npm package ships code and rules only** (no fixtures, demo or tests). `rules --check` therefore validates the rule schema only, and the demo needs the git clone.
 - `explain` knows 6 error signatures. Unknown output returns exit 1 and suggests `submit`.
 - Telemetry: none. Network: none unless you pass `--net`.
 
