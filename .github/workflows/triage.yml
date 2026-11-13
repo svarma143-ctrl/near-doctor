@@ -13,7 +13,8 @@ permissions:
 
 jobs:
   triage:
-    if: contains(github.event.issue.labels.*.name, 'friction')
+    # The issue form sets the label and the title prefix; either is enough (labels are only applied if they exist in the repo).
+    if: contains(github.event.issue.labels.*.name, 'friction') || startsWith(github.event.issue.title, '[friction]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
