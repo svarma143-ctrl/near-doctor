@@ -1,0 +1,10 @@
+[package]
+name = "fixture"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+near-sdk = "5"
+
+[dev-dependencies]
+anyhow = "1"

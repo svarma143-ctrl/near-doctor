@@ -1,0 +1,15 @@
+{
+  "__strict": true,
+  "rustup --version": {
+    "code": 0,
+    "stdout": "rustup 1.28.2\n"
+  },
+  "rustup target list --installed": {
+    "code": 0,
+    "stdout": "aarch64-apple-darwin\n"
+  },
+  "rustup target add wasm32-unknown-unknown": {
+    "code": 0,
+    "stdout": "installed\n"
+  }
+}

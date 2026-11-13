@@ -1,0 +1,2 @@
+error: 1. 🔨️  Use `cargo near build` instead of `cargo build` to compile your contract
+error: could not compile `near-sdk` (lib) due to 1 previous error

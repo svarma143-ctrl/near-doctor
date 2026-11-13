@@ -1,0 +1,4 @@
+{
+  "name": "fixture",
+  "scripts": { "deploy": "near dev-deploy build/contract.wasm" }
+}

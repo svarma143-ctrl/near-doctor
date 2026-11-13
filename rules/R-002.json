@@ -1,0 +1,19 @@
+{
+  "id": "R-002",
+  "severity": "info",
+  "tier": "reported",
+  "status": "log-only",
+  "title": "Apple Silicon wasm build failure (R_WASM_MEMORY_ADDR_SLEB, -fPIC), unconfirmed",
+  "summary": "A hackathon project README reports `relocation R_WASM_MEMORY_ADDR_SLEB cannot be used against symbol ... recompile with -fPIC` on Apple Silicon and works around it with Docker. We did not reproduce it: a pure-Rust contract built and deployed on an arm64 Mac. It is plausibly tied to C dependencies.",
+  "fix": {
+    "steps": [
+      "Unconfirmed. If you hit this, run `near-doctor submit` with the full error so the cause can be pinned down."
+    ]
+  },
+  "refs": [
+    "https://ethglobal.com/showcase/1inchtents-near-ffevd"
+  ],
+  "evidence": {
+    "observed": "Not reproduced 2026-11-13: a pure-Rust contract built with cargo near and deployed on macOS 15 arm64."
+  }
+}

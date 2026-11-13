@@ -1,0 +1,25 @@
+{
+  "id": "E-001",
+  "severity": "error",
+  "tier": "verified-here",
+  "status": "active",
+  "title": "cargo-near is not installed",
+  "summary": "Contracts are built with cargo-near. Without it, `cargo near ...` fails with `no such command: near`.",
+  "message": "`cargo near` is not available.",
+  "detect": {
+    "kind": "detector",
+    "name": "env-cargo-near"
+  },
+  "fix": {
+    "steps": [
+      "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/latest/download/cargo-near-installer.sh | sh",
+      "Verify with `cargo near --version`."
+    ]
+  },
+  "refs": [
+    "https://github.com/near/cargo-near"
+  ],
+  "evidence": {
+    "observed": "Observed 2026-11-13 on a freshly formatted Mac: `cargo near --version` failed with 'error: no such command: `near`' until the prebuilt installer script above was run."
+  }
+}

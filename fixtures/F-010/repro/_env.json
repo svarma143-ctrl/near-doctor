@@ -1,0 +1,7 @@
+{
+  "__strict": true,
+  "near --version": {
+    "code": 0,
+    "stdout": "4.0.13\n"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "id": "F-008",
+  "severity": "error",
+  "tier": "verified-here",
+  "status": "active",
+  "title": "`near dev-deploy` is used but the Node near CLI no longer has it",
+  "summary": "Older tutorials deploy with `near dev-deploy` (or `near dev deploy`). The Node near-cli 4.0.13 command list has no such command, so scripts and instructions copied from them fail.",
+  "message": "`near dev-deploy` appears in {file}:{line}; near-cli 4.0.13 (checked) has no such command.",
+  "detect": {
+    "kind": "file-regex",
+    "globs": [
+      "package.json",
+      "**/package.json",
+      "**/*.sh",
+      "Makefile",
+      "**/Makefile",
+      "**/*.yml",
+      "**/*.yaml",
+      "scripts/**",
+      "**/*.js",
+      "**/*.mjs"
+    ],
+    "any": [
+      "near\\s+dev[- ]deploy"
+    ]
+  },
+  "fix": {
+    "steps": [
+      "Create a funded testnet account: `near create-account <account-id>.testnet --useFaucet`.",
+      "Deploy with `near deploy <account-id> <wasm-file>`."
+    ]
+  },
+  "refs": [
+    "https://docs.near.org/smart-contracts/release/upgrade"
+  ],
+  "evidence": {
+    "observed": "Checked 2026-11-13: `near --help` for near-cli 4.0.13 lists add-credentials, call, create-account, delete-account, deploy, generate-key, state, view and others, and no dev-deploy. The NEAR docs show `near create-account <account-id> --useFaucet` and `near deploy <account-id> <wasm-file>`."
+  }
+}

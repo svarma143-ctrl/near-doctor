@@ -1,0 +1,29 @@
+{
+  "id": "E-002",
+  "severity": "error",
+  "tier": "reported",
+  "status": "active",
+  "title": "The wasm32-unknown-unknown Rust target is not installed",
+  "summary": "NEAR contracts compile to wasm32-unknown-unknown. Without the target, wasm builds fail until it is added with rustup.",
+  "message": "The rustup target wasm32-unknown-unknown is not installed.",
+  "detect": {
+    "kind": "detector",
+    "name": "env-wasm-target"
+  },
+  "fix": {
+    "steps": [
+      "Run `rustup target add wasm32-unknown-unknown`."
+    ],
+    "autofix": {
+      "type": "rustup-target-add",
+      "target": "wasm32-unknown-unknown",
+      "description": "Run `rustup target add wasm32-unknown-unknown`"
+    }
+  },
+  "refs": [
+    "https://github.com/near/cargo-near/issues/439"
+  ],
+  "evidence": {
+    "note": "cargo-near's own proposal for `cargo near check` lists verifying that this target is installed. We installed it up front and did not observe the failure."
+  }
+}

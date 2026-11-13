@@ -1,0 +1,36 @@
+{
+  "id": "F-006",
+  "severity": "warn",
+  "tier": "verified-here",
+  "status": "active",
+  "title": "near-api-js callFunction throws on failed transactions (and prints the whole outcome)",
+  "summary": "In near-api-js v7, `callFunction` and `callFunctionRaw` throw when the transaction fails, and the thrown error prints the entire raw outcome (about 100 lines). Code that expects to inspect `Failure` afterwards never gets the chance.",
+  "message": "{file}:{line} calls callFunction/callFunctionRaw and inspects `Failure` without `throwOnFailure: false`.",
+  "detect": {
+    "kind": "file-regex",
+    "globs": [
+      "**/*.js",
+      "**/*.mjs",
+      "**/*.cjs"
+    ],
+    "all": [
+      "\\.callFunction(?:Raw)?\\(",
+      "Failure"
+    ],
+    "unless": [
+      "throwOnFailure"
+    ]
+  },
+  "fix": {
+    "steps": [
+      "To record an expected failure use `account.signAndSendTransaction({ receiverId, actions: [actions.functionCall(...)], waitUntil: 'FINAL', throwOnFailure: false })` and inspect `status.Failure` and each `receipts_outcome[].outcome.status.Failure`.",
+      "Otherwise wrap the call in try/catch and catch the exported error classes instead of parsing messages."
+    ]
+  },
+  "refs": [
+    "https://www.npmjs.com/package/near-api-js"
+  ],
+  "evidence": {
+    "observed": "Reproduced 2026-11-13 with near-api-js 7.5.3: `callFunctionRaw` threw on a failed transaction and printed the raw outcome (about 100 lines). The package README states that Account throws on failure by default."
+  }
+}

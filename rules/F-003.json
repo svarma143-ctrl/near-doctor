@@ -1,0 +1,33 @@
+{
+  "id": "F-003",
+  "severity": "info",
+  "tier": "verified-here",
+  "status": "active",
+  "title": "near-workspaces wraps the real compile error in a long, misleading dump",
+  "summary": "`near_workspaces::compile_project` reports a failed build as `error running a build command with cargo near`, followed by a note that cargo-near may not be installed, even when cargo-near is installed and the real cause is a compiler error far below in the output.",
+  "symptoms": [
+    {
+      "pattern": "error running a build command with `cargo near",
+      "extract": [
+        {
+          "var": "realError",
+          "patterns": [
+            "error\\[E\\d+\\]:[^\\n]*",
+            "\\berror:(?! could not compile)[^\\n]*"
+          ]
+        }
+      ]
+    }
+  ],
+  "fix": {
+    "steps": [
+      "Ignore the 'cargo-near is not installed' note unless `cargo near --version` itself fails.",
+      "Read the first `error[E....]` line in the dump (shown above as the real cause).",
+      "Reproduce faster with `cargo near check` in the contract directory."
+    ]
+  },
+  "refs": [],
+  "evidence": {
+    "observed": "Reproduced 2026-11-13 (macOS 15 arm64, rustc 1.100.0, cargo-near 0.23.0, near-sdk 5.30.1, node 26.12.1): sandbox tests printed about 150 lines ending in a build failure; the real cause (E0428) was roughly 100 lines below the misleading note."
+  }
+}

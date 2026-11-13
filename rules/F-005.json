@@ -1,0 +1,31 @@
+{
+  "id": "F-005",
+  "severity": "warn",
+  "tier": "verified-here",
+  "status": "active",
+  "title": "Sandbox balance assertions race with gas refunds when using max_gas()",
+  "summary": "Prepaid gas from `.max_gas()` is refunded asynchronously, so a balance read right after a transaction can be off by up to about 1 NEAR and the refund lands later.",
+  "message": "{file}:{line} uses `.max_gas()` and reads balances.",
+  "detect": {
+    "kind": "file-regex",
+    "globs": [
+      "**/tests/**/*.rs"
+    ],
+    "all": [
+      "\\.max_gas\\(\\)",
+      "(?:balance|view_account)"
+    ],
+    "flags": "i"
+  },
+  "fix": {
+    "steps": [
+      "Attach explicit gas (about 60 Tgas) instead of `.max_gas()`.",
+      "Call `worker.fast_forward(5)` before reading balances.",
+      "Allow a small gas tolerance in balance assertions."
+    ]
+  },
+  "refs": [],
+  "evidence": {
+    "observed": "Reproduced 2026-11-13 (macOS 15 arm64, rustc 1.100.0, cargo-near 0.23.0, near-sdk 5.30.1, node 26.12.1): with max_gas the borrower balance delta read 11.0007 NEAR instead of 10 NEAR right after the transaction; explicit 60 Tgas plus fast_forward(5) gave stable results."
+  }
+}

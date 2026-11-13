@@ -1,0 +1,12 @@
+{
+  "id": "F-014",
+  "severity": "info",
+  "tier": "hypothesis",
+  "status": "log-only",
+  "title": "Time-based contract paths in sandbox tests (untested)",
+  "summary": "To test a due date we waited about 62 seconds of real time. We did not test whether `worker.fast_forward` alone advances block time enough, so this entry makes no claim.",
+  "refs": [],
+  "evidence": {
+    "observed": "Not tested (2026-11-13). Kept so nobody repeats the assumption as fact."
+  }
+}

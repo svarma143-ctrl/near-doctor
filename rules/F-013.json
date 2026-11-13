@@ -1,0 +1,18 @@
+{
+  "id": "F-013",
+  "severity": "info",
+  "tier": "verified-here",
+  "status": "log-only",
+  "title": "cargo near compiles the dependency tree twice on a cold cache",
+  "summary": "`cargo near build` and `cargo near check` first generate the ABI in a dev-profile pass and then build the wasm in a release pass, so the first build compiles all dependencies twice.",
+  "fix": {
+    "steps": [
+      "Expect a slow first build; later builds reuse the cache.",
+      "Use `cargo near check` while iterating."
+    ]
+  },
+  "refs": [],
+  "evidence": {
+    "observed": "Observed 2026-11-13 (macOS 15 arm64, rustc 1.100.0, cargo-near 0.23.0, near-sdk 5.30.1, node 26.12.1): the build output listed about 100 crates compiled under 'Generating ABI' and again under 'Building contract'."
+  }
+}

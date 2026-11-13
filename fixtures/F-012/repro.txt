@@ -1,0 +1,5 @@
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `anyhow`
+  --> tests/sandbox.rs:39:21
+   |
+39 | async fn setup() -> anyhow::Result<Env> {
+   |                     ^^^^^^ use of unresolved module or unlinked crate `anyhow`

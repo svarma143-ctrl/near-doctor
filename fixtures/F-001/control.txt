@@ -1,0 +1,2 @@
+Compiling near-intent-fi v0.1.0
+Finished `release` profile [optimized] target(s) in 0.20s

@@ -1,0 +1,2 @@
+Checking near-intent-fi v0.1.0
+Finished `dev` profile in 0.37s

@@ -1,0 +1,25 @@
+{
+  "id": "F-002",
+  "severity": "error",
+  "tier": "verified-here",
+  "status": "active",
+  "title": "Plain `cargo check` is rejected on a contract crate",
+  "summary": "On a contract crate, plain `cargo check` (host target) fails with near-sdk's guard even though `cargo test` works, because the guard is only lifted by the unit-testing feature or by the on-chain build environment that cargo-near sets up.",
+  "symptoms": [
+    {
+      "pattern": "Use `cargo near build` instead of `cargo build`"
+    }
+  ],
+  "fix": {
+    "steps": [
+      "Use `cargo near check` to type-check a contract (add `--clippy` for lints). It uses the same environment as `cargo near build`.",
+      "Keep using `cargo test` for unit tests."
+    ]
+  },
+  "refs": [
+    "https://github.com/near/cargo-near"
+  ],
+  "evidence": {
+    "observed": "Reproduced 2026-11-13 (macOS 15 arm64, rustc 1.100.0, cargo-near 0.23.0, near-sdk 5.30.1, node 26.12.1): `cargo check` on the contract crate failed with this message while `cargo test --lib` passed. Whether editors (rust-analyzer) surface it was not tested."
+  }
+}

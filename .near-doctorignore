@@ -1,0 +1,7 @@
+# near-doctor scanning its own repo: fixtures, rules and docs intentionally contain the broken patterns
+fixtures/**
+rules/**
+docs/**
+demo/**
+test/**
+scripts/**

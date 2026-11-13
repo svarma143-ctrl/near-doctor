@@ -1,0 +1,7 @@
+{
+  "__strict": true,
+  "cargo --version": {
+    "code": 0,
+    "stdout": "cargo 1.100.0\n"
+  }
+}

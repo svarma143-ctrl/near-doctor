@@ -1,0 +1,7 @@
+{
+  "__strict": true,
+  "near --version": {
+    "code": 0,
+    "stdout": "near-cli-rs 0.20.0\n"
+  }
+}

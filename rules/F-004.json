@@ -1,0 +1,38 @@
+{
+  "id": "F-004",
+  "severity": "warn",
+  "tier": "verified-here",
+  "status": "active",
+  "title": "clippy::too_many_arguments fires on #[near] method wrappers",
+  "summary": "A public #[near] method with more than 7 parameters (counting self) makes clippy fail with `too many arguments` on code the macro generates. An allow attribute on the impl did not silence it; a crate-level allow did.",
+  "message": "`{name}` has {count} parameters (clippy limit {max}); `cargo clippy -D warnings` will fail on the generated wrapper.",
+  "detect": {
+    "kind": "detector",
+    "name": "rust-near-too-many-args",
+    "params": {
+      "max": 7
+    }
+  },
+  "symptoms": [
+    {
+      "pattern": "this function has too many arguments \\((?<count>\\d+)/(?<max>\\d+)\\)"
+    }
+  ],
+  "fix": {
+    "steps": [
+      "Add `#![allow(clippy::too_many_arguments)]` at the top of the crate root (after any `//!` docs) with a comment; an attribute on the impl does not silence the generated wrapper.",
+      "Or group the arguments into a struct if you can change the JSON interface."
+    ],
+    "agent": "Add `#![allow(clippy::too_many_arguments)]` at the top of {crateRoot} (after any `//!` docs) with a short comment explaining that the #[near] wrapper repeats the arguments, then run `cargo near check --clippy`.",
+    "autofix": {
+      "type": "rust-crate-attr",
+      "attr": "#![allow(clippy::too_many_arguments)]",
+      "comment": "near-doctor F-004: the #[near] macro wrapper repeats the arguments; an allow on the impl does not silence clippy.",
+      "description": "Add a crate-level #![allow(clippy::too_many_arguments)] to the crate root"
+    }
+  },
+  "refs": [],
+  "evidence": {
+    "observed": "Reproduced 2026-11-13 (macOS 15 arm64, rustc 1.100.0, cargo-near 0.23.0, near-sdk 5.30.1, node 26.12.1): `cargo clippy -D warnings` failed with 'too many arguments (8/7)' on a #[near] impl; an allow on the impl did not help; a crate-level allow did."
+  }
+}

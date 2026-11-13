@@ -1,0 +1,54 @@
+{
+  "id": "R-001",
+  "severity": "info",
+  "tier": "reported",
+  "status": "historical",
+  "title": "CompilationError(PrepareError(Deserialization)) on deploy (does not reproduce on current testnet)",
+  "summary": "Reports from 2023 to 2025 attribute this deploy-time error to wasm built with newer Rust (1.82+) enabling wasm features that nearcore did not yet accept; `cargo near build` post-processes the module. We could not reproduce it on current infrastructure, so this rule is historical: it explains the error when pasted but never warns by default.",
+  "message": "Hand-rolled wasm build in {file}:{line} (historical risk; see R-001).",
+  "detect": {
+    "kind": "file-regex",
+    "globs": [
+      "package.json",
+      "**/package.json",
+      "Makefile",
+      "**/Makefile",
+      "**/*.sh",
+      "**/*.yml",
+      "**/*.yaml",
+      "scripts/**"
+    ],
+    "any": [
+      "cargo\\s+build[^\\n]*wasm32-unknown-unknown"
+    ],
+    "unless": [
+      "cargo\\s+near"
+    ]
+  },
+  "symptoms": [
+    {
+      "pattern": "PrepareError\\(Deserialization\\)|\\\"PrepareError\\\"\\s*:\\s*\\\"Deserialization\\\""
+    }
+  ],
+  "fix": {
+    "steps": [
+      "If you see this error, build with `cargo near build` (it post-processes the wasm) and compare against a known-good example contract.",
+      "On older nodes or toolchains, reports mention pinning Rust to 1.81 or running wasm-opt manually; check which node version you deploy to.",
+      "The most-cited cause is the wasm module's features, not the RPC or the SDK; check how the wasm was built before changing either."
+    ]
+  },
+  "refs": [
+    "https://reddit.com/r/nearprotocol/comments/1jt9d53/anyone_having_issues_with_latest_version_near",
+    "https://github.com/near/near-sdk-rs/issues/1035",
+    "https://github.com/near/near-workspaces-js/issues/225",
+    "https://stackoverflow.com/questions/71661190/near-protocol-rpc-contract-deployment-deserialization-error"
+  ],
+  "evidence": {
+    "reproduction": {
+      "result": "did not reproduce",
+      "sandbox": "near-workspaces 0.24: a raw plain-cargo wasm (rustc 1.100.0; target_features bulk-memory, bulk-memory-opt, call-indirect-overlong, multivalue, mutable-globals, nontrapping-fptoint, reference-types, sign-ext) deployed and `new` succeeded",
+      "testnet": "the same wasm deployed and initialised on live testnet (node 2.14.1, protocol 88) on 2026-11-13",
+      "untested": "mainnet and older nodes"
+    }
+  }
+}

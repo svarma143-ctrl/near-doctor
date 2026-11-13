@@ -1,0 +1,2 @@
+Checking near-sdk v5.30.1
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.13s

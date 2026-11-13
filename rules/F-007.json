@@ -1,0 +1,35 @@
+{
+  "id": "F-007",
+  "severity": "error",
+  "tier": "verified-here",
+  "status": "active",
+  "title": "Import from near-api-js that the installed version does not export (API drift)",
+  "summary": "near-api-js v7 removed or renamed many names from 0.x (WalletConnection, keyStores, connect, nearProviders). Tutorials and coding assistants still produce 0.x code, which fails at import or at first use. This check compares each named import with the exports of the version actually installed. JavaScript files only (TypeScript type-only imports would be false positives).",
+  "message": "`{name}` is imported from {package} in {file}:{line} but is not exported by the installed {package}@{version}. {hint}",
+  "detect": {
+    "kind": "detector",
+    "name": "js-import-exports",
+    "params": {
+      "package": "near-api-js",
+      "hints": {
+        "WalletConnection": "v7 targets backends and scripts; for browser sign-in use the official web login docs (NEAR wallet selector).",
+        "keyStores": "v7 ships no KeyStore implementation; pass a secret key string to `new Account(id, provider, secretKey)` or implement a Signer.",
+        "connect": "v7 has no `connect()`; use `new Account(accountId, provider, signer)`.",
+        "nearProviders": "Use `JsonRpcProvider`."
+      }
+    }
+  },
+  "fix": {
+    "steps": [
+      "{hint}",
+      "See the migration guide: https://github.com/near/near-api-js/blob/HEAD/MIGRATION.md"
+    ],
+    "agent": "In {file} at line {line}, `{name}` does not exist in {package}@{version}. {hint} Update the code and imports accordingly, then re-run near-doctor."
+  },
+  "refs": [
+    "https://raw.githubusercontent.com/near/near-api-js/HEAD/MIGRATION.md"
+  ],
+  "evidence": {
+    "observed": "Checked 2026-11-13: the exports of near-api-js 7.5.3 include Account, JsonRpcProvider, KeyPair, KeyPairSigner, Signer and actions, but not WalletConnection, nearProviders, keyStores, connect or Near. The migration guide states that no KeyStore implementation is included."
+  }
+}

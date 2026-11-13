@@ -1,0 +1,34 @@
+{
+  "name": "near-doctor",
+  "version": "0.1.0",
+  "description": "Preflight checks and an evidence-backed friction log for NEAR developers and their coding agents",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "near-doctor": "bin/near-doctor.mjs"
+  },
+  "main": "src/index.mjs",
+  "files": [
+    "bin",
+    "src",
+    "rules",
+    "docs/FRICTION_LOG.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/svarma143-ctrl/near-doctor.git"
+  },
+  "keywords": ["near", "doctor", "preflight", "cargo-near", "developer-experience", "agents"],
+  "scripts": {
+    "test": "node --test test/",
+    "test:slow": "NEAR_DOCTOR_SLOW=1 node --test test/slow.test.mjs",
+    "doctor": "node bin/near-doctor.mjs",
+    "log": "node scripts/gen-log.mjs",
+    "log:check": "node scripts/gen-log.mjs --check"
+  }
+}

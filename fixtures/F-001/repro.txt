@@ -1,0 +1,8 @@
+error[E0428]: the name `amount_owed` is defined multiple times
+   --> src/lib.rs:376:1
+    |
+123 | #[near]
+    | ------- previous definition of the value `amount_owed` here
+...
+376 | fn amount_owed(principal: u128, interest_bps: u32) -> u128 {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `amount_owed` redefined here

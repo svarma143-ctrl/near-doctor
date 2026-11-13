@@ -1,0 +1,25 @@
+{
+  "id": "F-010",
+  "severity": "info",
+  "tier": "verified-here",
+  "status": "active",
+  "title": "Two different `near` CLIs exist; the Node one is installed",
+  "summary": "The older Node `near-cli` and the Rust `near-cli-rs` have different command sets, and tutorials mix them. The near-cli-rs site describes itself as the recommended CLI for new users.",
+  "message": "The `near` on PATH is the Node near-cli {version}.",
+  "detect": {
+    "kind": "detector",
+    "name": "env-near-cli-flavor"
+  },
+  "fix": {
+    "steps": [
+      "Know which CLI you are using before following a tutorial: this one is the Node `near-cli`.",
+      "near-cli-rs is described as the recommended CLI for new users at https://near.cli.rs."
+    ]
+  },
+  "refs": [
+    "https://near.cli.rs/"
+  ],
+  "evidence": {
+    "observed": "Observed 2026-11-13: `npm i -g near-cli` printed about 15 deprecation warnings (@ledgerhq/*, prebuild-install, base-x) and `near --version` printed 4.0.13; near.cli.rs says near-cli-rs is recommended."
+  }
+}

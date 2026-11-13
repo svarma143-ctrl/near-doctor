@@ -1,0 +1,29 @@
+{
+  "id": "F-011",
+  "severity": "warn",
+  "tier": "verified-here",
+  "status": "active",
+  "title": "Public testnet RPC is slow (several seconds per call)",
+  "summary": "The public testnet RPC answered in 3.7 to 4.8 seconds per query. A short client timeout looks like a logic failure rather than a slow node.",
+  "message": "Median RPC latency to {url} was {ms} ms.",
+  "detect": {
+    "kind": "detector",
+    "name": "net-rpc-latency",
+    "params": {
+      "thresholdMs": 2000
+    }
+  },
+  "fix": {
+    "steps": [
+      "Use client timeouts of at least {recommended} ms for public RPC calls.",
+      "Issue independent reads in parallel.",
+      "For anything user-facing, use a dedicated or failover RPC provider: https://docs.near.org/api/rpc/providers"
+    ]
+  },
+  "refs": [
+    "https://docs.near.org/api/rpc/providers"
+  ],
+  "evidence": {
+    "observed": "Measured 2026-11-13: curl timings of 3.7 s and 4.8 s for two queries against https://rpc.testnet.near.org, and an 8 s timeout on RPC reads failed in a scorer service. Latency varies with time and location; run `near-doctor --net` to measure yours."
+  }
+}

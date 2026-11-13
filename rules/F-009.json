@@ -1,0 +1,17 @@
+{
+  "id": "F-009",
+  "severity": "info",
+  "tier": "hypothesis",
+  "status": "log-only",
+  "title": "npm 12 skips dependency install scripts with only a warning",
+  "summary": "npm 12 blocks install scripts unless they are approved. `near-sdk-js` has a postinstall that downloads CLI dependencies, and it was skipped with a warning. Whether that breaks later builds was not observed.",
+  "fix": {
+    "steps": [
+      "If a package's tooling is missing after install, run `npm install-scripts ls` and approve only packages you trust."
+    ]
+  },
+  "refs": [],
+  "evidence": {
+    "observed": "Warning observed 2026-11-13 (npm 12.0.2): 4 packages had install scripts blocked, including near-sdk-js postinstall, node-hid, usb and fsevents. The downstream effect was not observed."
+  }
+}

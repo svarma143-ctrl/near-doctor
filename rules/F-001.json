@@ -1,0 +1,39 @@
+{
+  "id": "F-001",
+  "severity": "error",
+  "tier": "verified-here",
+  "status": "active",
+  "title": "Helper function has the same name as a public #[near] method (wasm-only build error)",
+  "summary": "#[near] exports every public method of a contract impl as a wasm entry point with the same name, so a free function with that name in the same module collides (E0428). The host build used by `cargo test` does not generate those exports, so unit tests still pass and the error only appears when building for wasm.",
+  "message": "Free function `{name}` (line {line}) collides with the public #[near] method of the same name (line {methodLine}).",
+  "detect": {
+    "kind": "detector",
+    "name": "rust-near-name-collision"
+  },
+  "symptoms": [
+    {
+      "pattern": "error\\[E0428\\]: the name `(?<name>\\w+)` is defined multiple times",
+      "extract": [
+        {
+          "var": "realError",
+          "patterns": [
+            "error\\[E0428\\][^\\n]*"
+          ]
+        }
+      ]
+    }
+  ],
+  "fix": {
+    "steps": [
+      "Rename the free helper function `{name}` to something that is not a public method name (for example a `compute_` prefix) and update its call sites.",
+      "Use `cargo near check` in your edit loop: it reports this in seconds, while `cargo test --lib` still passes with the bug present."
+    ],
+    "agent": "In {file} at line {line}, rename the free function `{name}` to `{newName}` (leave the #[near] method at line {methodLine} unchanged) and update its call sites. Then run `cargo near check`."
+  },
+  "refs": [
+    "https://github.com/near/cargo-near/issues/439"
+  ],
+  "evidence": {
+    "observed": "Reproduced 2026-11-13 (macOS 15 arm64, rustc 1.100.0, cargo-near 0.23.0, near-sdk 5.30.1, node 26.12.1): with the clash, `cargo test --lib` passed 18/18 while the wasm build failed with E0428. `cargo near check` reported it in 8.5 s on a cold cache; the fixed control passed in 0.4 s."
+  }
+}

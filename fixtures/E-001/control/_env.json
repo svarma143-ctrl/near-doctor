@@ -1,0 +1,11 @@
+{
+  "__strict": true,
+  "cargo --version": {
+    "code": 0,
+    "stdout": "cargo 1.100.0\n"
+  },
+  "cargo near --version": {
+    "code": 0,
+    "stdout": "cargo-near-near 0.23.0\n"
+  }
+}

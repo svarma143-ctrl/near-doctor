@@ -1,0 +1,12 @@
+test default_path_claim_collateral ... Error: IO
+
+Caused by:
+    error running a build command with `cargo near ...`
+    NOTE: if `cargo-near` CLI is not installed, see https://github.com/near/cargo-near?tab=readme-ov-file#installation
+
+    Original command output:
+    • Building contract
+     │    Compiling near-intent-fi v0.1.0 (/Users/<user>/NearIntentFi/contract)
+     │ error[E0428]: the name `amount_owed` is defined multiple times
+     │    --> src/lib.rs:376:1
+     │ error: could not compile `near-intent-fi` (lib) due to 1 previous error
