@@ -233,7 +233,7 @@ References:
 Sandbox tests commonly use `anyhow::Result`. If `anyhow` is not declared, the build fails with E0433 even though near-workspaces is already a dev-dependency.
 
 Evidence:
-- observed: Reproduced 2026-11-13 (macOS 15 arm64, rustc 1.100.0, cargo-near 0.23.0, near-sdk 5.30.1, node 26.12.1): sandbox tests using `anyhow::Result` failed with E0433 until `anyhow` was added to [dev-dependencies]. The same error reproduced again in the near-doctor demo contract (tests/smoke.rs using anyhow::Result).
+- observed: Reproduced 2026-11-13 (macOS 15 arm64, rustc 1.100.0, cargo-near 0.23.0, near-sdk 5.30.1, node 26.12.1): sandbox tests using `anyhow::Result` failed with E0433 until `anyhow` was added to [dev-dependencies]. The same error reproduced again in the near-doctor demo contract (tests/smoke.rs using anyhow::Result). The second symptom pattern is the older rustc wording of the same E0433 error; it was added from the known message and not reproduced on this machine (only rustc 1.100.0 was available).
 
 Fix:
 1. Add `{crate} = "1"` under [dev-dependencies] in {manifest}.

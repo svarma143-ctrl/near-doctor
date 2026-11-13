@@ -191,3 +191,15 @@ test("show prints the full record with evidence; unknown ids are an error", asyn
   assert.equal(JSON.parse((await run(["show", "R-001", "--json"])).out).status, "historical");
   assert.equal((await run(["show", "F-999"])).code, 2);
 });
+
+test("explain recognises both rustc wordings of the undeclared-crate error (F-012)", async () => {
+  const dir = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), "nd-x-"));
+  const newer = path.join(dir, "new.txt");
+  const older = path.join(dir, "old.txt");
+  fs.writeFileSync(newer, "error[E0433]: cannot find module or crate `anyhow` in this scope\n  | use of unresolved module or unlinked crate `anyhow`\n");
+  fs.writeFileSync(older, "error[E0433]: failed to resolve: use of undeclared crate or module `anyhow`\n");
+  for (const f of [newer, older]) {
+    const r = await run(["explain", "--from", f]);
+    assert.match(r.out, /F-012/, f);
+  }
+});
