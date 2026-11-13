@@ -13,6 +13,52 @@ function plural(n, w) {
   return `${n} ${w}${n === 1 ? "" : "s"}`;
 }
 
+
+// ---------------------------------------------------------------- wrapping (interactive terminals only)
+const stripAnsi = (t) => t.replace(/\x1b\[[0-9;]*m/g, "");
+
+/**
+ * Wrap text at spaces to `width` columns with a hanging indent (the line's own indent, plus the width of a
+ * leading label such as "Fix:  ", "Auto: " or "1. "). ANSI colour codes do not count towards the width.
+ * Words longer than the width are left whole. Only used when stdout is a terminal; piped and JSON output
+ * is never wrapped.
+ */
+export function wrapText(text, width) {
+  if (!width || width < 20) return text;
+  return text
+    .split("\n")
+    .map((line) => {
+      if (stripAnsi(line).length <= width) return line;
+      // Leading ANSI codes (for example a dimmed line) may sit in front of the indent.
+      const lead = /^((?:\x1b\[[0-9;]*m)*)( *)/.exec(line);
+      const prefix = lead[0];
+      const indent = lead[2].length;
+      const body = line.slice(prefix.length);
+      const label = /^(?:Fix:|Why:|Auto:|observed:|\d+\.)\s+/.exec(stripAnsi(body));
+      const cont = " ".repeat(indent + (label ? label[0].length : 0));
+      const rows = [];
+      let cur = prefix;
+      let curLen = indent;
+      let empty = true; // no word on the current row yet
+      for (const tok of body.split(" ")) {
+        const tl = stripAnsi(tok).length;
+        const need = (empty ? 0 : 1) + tl;
+        if (!empty && curLen + need > width) {
+          rows.push(cur);
+          cur = cont + tok;
+          curLen = cont.length + tl;
+        } else {
+          cur += (empty ? "" : " ") + tok;
+          curLen += need;
+        }
+        empty = false;
+      }
+      rows.push(cur);
+      return rows.join("\n");
+    })
+    .join("\n");
+}
+
 export function formatFinding(f, c, { verbose = false } = {}) {
   const sev = { error: c.red("ERROR"), warn: c.yellow("WARN "), info: c.cyan("INFO ") }[f.severity];
   const where = f.file ? `${f.file}${f.line ? ":" + f.line : ""}` : "";
@@ -35,7 +81,7 @@ export function formatFinding(f, c, { verbose = false } = {}) {
   return lines.join("\n");
 }
 
-export function formatCheck(result, { color = false, verbose = false } = {}) {
+export function formatCheck(result, { color = false, verbose = false, width } = {}) {
   const c = palette(color);
   const s = result.summary;
   const total = s.error + s.warn + s.info;
@@ -55,7 +101,7 @@ export function formatCheck(result, { color = false, verbose = false } = {}) {
   }
   const fixable = result.findings.filter((f) => f.fix.autofix).length;
   if (fixable) out.push(`${plural(fixable, "finding")} can be fixed automatically: near-doctor fix --safe`);
-  return out.join("\n").replace(/\n+$/, "") + "\n";
+  return wrapText(out.join("\n"), width).replace(/\n+$/, "") + "\n";
 }
 
 /**
@@ -87,7 +133,7 @@ export function formatExplain(matches, { color = false } = {}) {
   return out.join("\n");
 }
 
-export function formatRuleDetail(r) {
+export function formatRuleDetail(r, { width } = {}) {
   const L = [`${r.id}  ${r.title}`, `  status ${r.status} · tier ${r.tier} · severity ${r.severity} · used for: ${detectKind(r)}`, "", `  ${r.summary}`, ""];
   if (r.evidence) {
     L.push("  Evidence:");
@@ -103,7 +149,7 @@ export function formatRuleDetail(r) {
   if (r.fix?.autofix) L.push(`  Auto-fix (near-doctor fix --safe): ${r.fix.autofix.description}`, "");
   if (r.refs?.length) L.push("  References:", ...r.refs.map((u) => `    ${u}`), "");
   L.push(`  Fixtures: fixtures/${r.id}/`);
-  return L.join("\n") + "\n";
+  return wrapText(L.join("\n"), width) + "\n";
 }
 
 const detectKind = (r) => (r.status === "log-only" ? "log only" : [r.detect ? "scan" : null, r.symptoms ? "explain" : null].filter(Boolean).join("+"));

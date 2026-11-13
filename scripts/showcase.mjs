@@ -46,6 +46,10 @@ async function type(text) {
   }
   process.stdout.write("\n");
 }
+// Start a new scene: clear the screen so each step is fully visible (real terminal only).
+const scene = () => {
+  if (tty) process.stdout.write("\x1bc");
+};
 const say = async (text, ms = 1600) => {
   console.log(dim(`# ${text}`));
   await sleep(ms);
@@ -77,9 +81,11 @@ await sleep(2200);
 await say("A small tip-jar contract. The unit tests pass, but it has four problems.");
 expect("scan", await run("near-doctor --ignore F-010", { pause: 4500 }), 1);
 
+scene();
 await say("Two of them are deterministic. near-doctor fixes those itself:");
 expect("fix", await run("near-doctor fix --safe --ignore F-010", { pause: 3500 }), 1);
 
+scene();
 await say("The other two need judgement. --json hands each one to a coding agent as a task plus a check.");
 await say("Here the agent's edits are applied from demo/agent-fixes.patch:", 1200);
 try {
@@ -101,6 +107,7 @@ if (cargoNear) {
   await say("(cargo-near is not installed here, so the real `cargo near check` step is skipped)", 2000);
 }
 
+scene();
 await say("Every rule has evidence behind it: what was reproduced, where, and on which versions.");
 expect("show", await run("near-doctor show F-001", { pause: 5000 }), 0);
 

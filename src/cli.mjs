@@ -11,6 +11,9 @@ import { makeRunner } from "./util.mjs";
 import { inspectWasm } from "./wasm.mjs";
 
 const COMMANDS = new Set(["check", "explain", "fix", "inspect", "show", "submit", "rules", "help", "version"]);
+// Wrap only on an interactive terminal; piped, JSON and CI output stays unwrapped for machines and tests.
+const termWidth = () => (process.stdout.isTTY && process.stdout.columns ? Math.max(40, process.stdout.columns - 2) : undefined);
+
 const BOOL = new Set(["verbose", "allow-exec", "json", "deep", "clippy", "net", "historical", "safe", "dry-run", "markdown", "check", "no-color", "help", "version"]);
 const VALUE = new Set(["rpc", "only", "ignore", "fail-on", "rules", "from", "out", "command"]);
 
@@ -162,7 +165,7 @@ export async function main(argv, io = {}) {
         return 2;
       }
       const { __file, ...pub } = rule;
-      out(flags.json ? JSON.stringify(pub, null, 2) + "\n" : formatRuleDetail(rule));
+      out(flags.json ? JSON.stringify(pub, null, 2) + "\n" : formatRuleDetail(rule, { width: termWidth() }));
       return 0;
     }
 
@@ -210,7 +213,7 @@ export async function main(argv, io = {}) {
 
     if (command === "check") {
       const result = await runChecks(base);
-      out(flags.json ? JSON.stringify(publicResult(result), null, 2) + "\n" : formatCheck(result, { color, verbose: flags.verbose }));
+      out(flags.json ? JSON.stringify(publicResult(result), null, 2) + "\n" : formatCheck(result, { color, verbose: flags.verbose, width: termWidth() }));
       return exitFor(result.summary);
     }
 
@@ -228,7 +231,7 @@ export async function main(argv, io = {}) {
         if (!results.length) out("Nothing to fix automatically.\n");
         for (const r of results) out(`${r.status.toUpperCase().padEnd(8)} ${r.id}  ${r.detail}${r.file ? `  (${r.file})` : ""}\n`);
         if (after) {
-          out("\nRe-check:\n" + formatCheck(after, { color }));
+          out("\nRe-check:\n" + formatCheck(after, { color, width: termWidth() }));
         }
       }
       return after ? exitFor(after.summary) : 0;

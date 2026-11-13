@@ -35,6 +35,10 @@ node scripts/demo.mjs
 ```
 
 The same flow, paced for a screen recording (about 50 seconds, every command executed for real): `node scripts/showcase.mjs`.
+A recording of exactly that run is in [docs/demo.mp4](docs/demo.mp4) (54 s, no audio). It was made by running the script in a
+pseudo-terminal, replaying the captured output through a terminal emulator and encoding the frames with ffmpeg
+([scripts/recording](scripts/recording)); it is not a mock-up. The one scripted part is stated on screen: the agent's edits
+come from `demo/agent-fixes.patch`.
 
 You should see: a deliberately broken contract (`demo/broken-contract`) produce four findings, two fixed by
 `near-doctor fix --safe`, two fixed by applying the edits an agent made from `near-doctor --json`, then a clean report,

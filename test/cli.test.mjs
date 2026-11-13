@@ -211,3 +211,31 @@ test("show never prints raw {placeholders} for any rule", async () => {
     assert.ok(!/\{\w+\}/.test(out), `${r.id}: ${out.match(/\{\w+\}/)}`);
   }
 });
+
+test("wrapText wraps at spaces with a hanging indent, ignores ANSI codes, and leaves short lines and long words alone", async () => {
+  const { wrapText } = await import("../src/report.mjs");
+  const text = "      Fix:  one two three four five six seven eight nine ten";
+  const w = wrapText(text, 30).split("\n");
+  assert.ok(w.length > 1);
+  assert.ok(w.every((l) => l.length <= 30), w.join("|"));
+  assert.ok(w[0].startsWith("      Fix:  one"), "first row keeps its indent and label");
+  assert.ok(w.slice(1).every((l) => l.startsWith(" ".repeat(12)) && l[12] !== " "), "hanging indent under the text after 'Fix:  '");
+  assert.equal(w.join(" ").replace(/\s+/g, " ").trim(), text.replace(/\s+/g, " ").trim(), "no words lost or split");
+  assert.equal(wrapText("short", 30), "short");
+  assert.equal(wrapText(text, undefined), text, "no width means no wrapping");
+  const dimmed = wrapText("\x1b[2m      dim words that are long enough to wrap around the edge\x1b[0m", 30).split("\n");
+  assert.ok(dimmed[0].startsWith("\x1b[2m      dim"), "indent kept after a leading ANSI code");
+  assert.ok(dimmed.slice(1).every((l) => l.startsWith("      ")));
+  const coloured = "  \x1b[32mgreen words that are long enough to wrap around the edge\x1b[0m";
+  const cw = wrapText(coloured, 24).split("\n");
+  assert.ok(cw.every((l) => l.replace(/\x1b\[[0-9;]*m/g, "").length <= 24));
+  const long = "  https://example.com/a/very/long/unbreakable/token/that/exceeds/the/width/by/far";
+  assert.equal(wrapText(long, 20), long);
+});
+
+test("output is not wrapped when stdout is not a terminal", async () => {
+  const dir = copyFixture("F-004/repro");
+  const r = await run([dir, "--only", "F-004"]);
+  const longest = Math.max(...r.out.split("\n").map((l) => l.length));
+  assert.ok(longest > 120, "the Fix line stays on one line for machines");
+});
