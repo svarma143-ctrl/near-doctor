@@ -120,7 +120,7 @@ near-doctor adds executable checks, a verified rule database and a contribution 
   `Failure` check far from the call.
 - **"Agents fix" is limited.** Three allowlisted autofixes plus agent-ready tasks. LLM-drafted rules are not
   implemented; the triage script drafts rules deterministically from the first error line.
-- **CI ran green on GitHub once** (Node 20 and 22, one push). The triage workflow has not been exercised on GitHub yet; the script behind it is tested locally.
+- **CI and triage have each run on GitHub.** CI is green on Node 20 and 22. The triage workflow matched a test issue to F-012 and replied (one test issue, with real rustc output). Neither has had sustained use.
 - **Rules ship with the tool.** `--rules DIR` loads another pack, but there is no update channel yet.
 - **Not published to npm**; install from the repo. The package builds and runs when installed from a local tarball.
 - `explain` knows 6 error signatures. Unknown output returns exit 1 and suggests `submit`.
