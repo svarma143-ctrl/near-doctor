@@ -1,11 +1,11 @@
 {
   "id": "F-005",
-  "severity": "warn",
+  "severity": "info",
   "tier": "verified-here",
   "status": "active",
   "title": "Sandbox balance assertions race with gas refunds when using max_gas()",
-  "summary": "Prepaid gas from `.max_gas()` is refunded asynchronously, so a balance read right after a transaction can be off by up to about 1 NEAR and the refund lands later.",
-  "message": "{file}:{line} uses `.max_gas()` and reads balances.",
+  "summary": "Prepaid gas from `.max_gas()` is refunded asynchronously, so a balance read right after a transaction can be off by up to about 1 NEAR and the refund lands later. This check is a heuristic: it fires on test files that use `.max_gas()`, read a balance and contain an assert, without proving the assert depends on that balance. Severity is info because a scan of public repos found roughly a third of hits in a small sample were unrelated reads.",
+  "message": "{file}:{line} uses `.max_gas()` and asserts on balances; the refund may not have landed yet.",
   "detect": {
     "kind": "file-regex",
     "globs": [
@@ -13,7 +13,8 @@
     ],
     "all": [
       "\\.max_gas\\(\\)",
-      "(?:balance|view_account)"
+      "\\.balance\\b(?!\\s*\\()|get_account_balance|account_balance",
+      "assert\\w*!"
     ],
     "flags": "i"
   },

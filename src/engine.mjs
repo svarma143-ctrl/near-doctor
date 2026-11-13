@@ -153,12 +153,13 @@ export async function runChecks(opts) {
     }
   }
 
-  // De-duplicate (static + deep can report the same thing); prefer the one with a file and line.
+  // De-duplicate: identical findings collapse; a deep finding is dropped when a static finding already
+  // names the same thing (same rule and name), because the static one carries the file and line.
   const byKey = new Map();
-  for (const f of findings) {
-    const key = f.vars.name ? `${f.id}:${f.vars.name}` : `${f.id}:${f.file}:${f.line}`;
-    const prev = byKey.get(key);
-    if (!prev || (!prev.line && f.line)) byKey.set(key, f);
+  for (const f of findings.filter((x) => x.source !== "deep")) byKey.set(`${f.id}:${f.vars.name ?? ""}:${f.file}:${f.line}`, f);
+  for (const f of findings.filter((x) => x.source === "deep")) {
+    const dup = f.vars.name && [...byKey.values()].some((x) => x.id === f.id && x.vars.name === f.vars.name);
+    if (!dup) byKey.set(`${f.id}:${f.vars.name ?? ""}:${f.file}:${f.line}`, f);
   }
   const out = [...byKey.values()].sort(
     (a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity] || a.id.localeCompare(b.id) || (a.file || "").localeCompare(b.file || ""),

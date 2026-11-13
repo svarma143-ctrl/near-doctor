@@ -30,7 +30,9 @@ Step by step on the broken contract:
 node bin/near-doctor.mjs demo/broken-contract          # 4 findings with file:line (F-001, F-004, F-008, F-012)
 node bin/near-doctor.mjs demo/broken-contract --json   # agent-ready: task + acceptance command per finding
 node bin/near-doctor.mjs explain --from fixtures/F-003/repro.txt   # paste any tool output, get cause + fix
+node bin/near-doctor.mjs show F-001                    # one friction record with its evidence
 node bin/near-doctor.mjs rules                         # the friction log (18 records)
+npm run verify                                         # checks every claim in this README, prints PASS/FAIL
 node bin/near-doctor.mjs . --net                       # also measures your public RPC latency (only network access)
 ```
 
@@ -38,7 +40,8 @@ node bin/near-doctor.mjs . --net                       # also measures your publ
 
 | Command | What you get |
 | --- | --- |
-| `near-doctor [path]` | Static and environment checks, no network. Findings carry file, line, why, fix and evidence tier. |
+| `near-doctor [path]` | Static and environment checks, no network. Compact output: file, line, first fix step, evidence tier. `--verbose` adds the why and every step. |
+| `near-doctor show F-001` | The full record for one friction entry: summary, evidence, fix steps, fixtures. |
 | `near-doctor --deep` | Also runs the real `cargo near check` and explains its output. |
 | `near-doctor explain --from FILE` | Paste output (or `--from -`); get the known cause and fix, including the real error buried in long dumps. |
 | `near-doctor fix --safe` | Applies deterministic, allowlisted fixes, then re-checks. `--dry-run` previews. |
@@ -71,6 +74,16 @@ NEAR build error (Reddit, near-sdk-rs #1035, near-workspaces-js #225, Stack Over
 wasm with post-MVP features deployed and initialised on the sandbox and on live testnet (node 2.14.1, protocol 88). It
 does not reproduce today, so it is `historical`: it explains the error when pasted but never warns.
 
+### Tested on real code
+
+I ran the static rules over 150 public repos from this hackathon (50 each of Rust, TypeScript and JavaScript) and
+read a sample of the flagged source by hand. Results in [docs/STUDY.md](docs/STUDY.md): 21 of 50 Rust repos have a
+`#[near]` method that makes clippy warn (F-004), 17 of 100 JS/TS repos call `Account.callFunction[Raw]` and then inspect `Failure` without
+`throwOnFailure: false` (F-006), 49 of 150 have at least one finding. The study also exposed false positives in four of my
+own first-version rules (F-004, F-005, F-006, F-012); they are fixed and each has a regression test. It is a convenience sample, flagged repos were
+not compiled, and build-breaking problems such as F-001 and F-008 show zero hits because published code has already
+been fixed.
+
 Example, found while building a lending contract for the same hackathon: **F-001**. A helper function with the same
 name as a public `#[near]` method breaks only the wasm build. `cargo test --lib` still passed 18/18 with the bug;
 `cargo near check` reports it in seconds.
@@ -97,22 +110,27 @@ near-doctor adds executable checks, a verified rule database and a contribution 
 ## Limitations
 
 - **Scanners are lightweight, not compilers.** The Rust scanner strips comments and strings and tracks braces; it is
-  not a parser, so it can miss or misjudge unusual code (macro-generated items, `#[path]` modules). F-007 checks
-  JavaScript only (TypeScript type-only imports would be false positives).
-- **Evidence is narrow.** Verified on one machine and one set of versions. Linux, Windows, other versions, and mainnet
-  are untested. Node 20 and 22 were not run (development used Node 26).
+  not a parser, so it can miss or misjudge unusual code (macro-generated items, `#[path]` modules). F-007 reads the
+  installed package's type declarations and never runs the package unless you pass `--allow-exec`.
+- **Evidence is narrow.** Rules were reproduced on one machine and one set of versions (macOS 15 arm64, rustc 1.100.0,
+  cargo-near 0.23.0, near-sdk 5.30.1). Linux, Windows and mainnet are untested. The test suite and the demo pass on
+  Node 20.20.2, 22.23.5 and 26.12.1.
+- **Precision is sampled, not measured.** False positives were hunted by reading flagged source in public repos (see
+  [docs/STUDY.md](docs/STUDY.md)). F-005 is a pattern match (`info`), and about a quarter of F-006 hits have the
+  `Failure` check far from the call.
 - **"Agents fix" is limited.** Three allowlisted autofixes plus agent-ready tasks. LLM-drafted rules are not
   implemented; the triage script drafts rules deterministically from the first error line.
 - **CI and the triage workflow have not been run on GitHub.** The scripts behind them are tested locally; the YAML is not.
 - **Rules ship with the tool.** `--rules DIR` loads another pack, but there is no update channel yet.
 - **Not published to npm**; install from the repo. The package builds and runs when installed from a local tarball.
-- The `explain` command knows 6 error signatures. Unknown output returns exit 1 and suggests `submit`.
+- `explain` knows 6 error signatures. Unknown output returns exit 1 and suggests `submit`.
 - Telemetry: none. Network: none unless you pass `--net`.
 
 ## Development
 
 ```bash
-npm test                                   # 66 tests (+1 slow end-to-end test), including the fixture gate (every rule vs repro and control)
+npm test                                   # 82 tests (1 slow end-to-end test is skipped unless NEAR_DOCTOR_SLOW=1), including the fixture gate
+npm run verify                             # checks each README claim: 13 PASS lines with the command behind each
 npm run test:slow                          # real toolchain end to end (needs cargo + cargo-near)
 npm run log                                # regenerate docs/FRICTION_LOG.md
 node bin/near-doctor.mjs . --fail-on warn  # near-doctor scans itself (fixtures, rules and docs are ignored)

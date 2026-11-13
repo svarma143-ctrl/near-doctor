@@ -4,18 +4,20 @@
   "tier": "verified-here",
   "status": "active",
   "title": "near-api-js callFunction throws on failed transactions (and prints the whole outcome)",
-  "summary": "In near-api-js v7, `callFunction` and `callFunctionRaw` throw when the transaction fails, and the thrown error prints the entire raw outcome (about 100 lines). Code that expects to inspect `Failure` afterwards never gets the chance.",
-  "message": "{file}:{line} calls callFunction/callFunctionRaw and inspects `Failure` without `throwOnFailure: false`.",
+  "summary": "In near-api-js v7, `callFunction` and `callFunctionRaw` throw when the transaction fails, and the thrown error prints the entire raw outcome (about 100 lines). Code that expects to inspect `Failure` afterwards never gets the chance. Calls on a provider (`provider.callFunction`, `provider.callFunctionRaw`) are read-only views and are not flagged; identifiers that merely contain the word, such as `DemoFailure`, do not count as inspecting `Failure`.",
+  "message": "{file}:{line} calls callFunction/callFunctionRaw (near-api-js) and inspects `Failure` without `throwOnFailure: false`.",
   "detect": {
     "kind": "file-regex",
     "globs": [
       "**/*.js",
       "**/*.mjs",
-      "**/*.cjs"
+      "**/*.cjs",
+      "**/*.ts"
     ],
     "all": [
-      "\\.callFunction(?:Raw)?\\(",
-      "Failure"
+      "near-api-js",
+      "(?<![pP]rovider)\\.callFunctionRaw\\(|\\b\\w*[aA]ccount\\w*\\.callFunction\\(|\\b(?:signer|acct|acc|wallet)\\.callFunction\\(",
+      "\\bFailure\\b"
     ],
     "unless": [
       "throwOnFailure"
@@ -32,6 +34,6 @@
     "https://www.npmjs.com/package/near-api-js"
   ],
   "evidence": {
-    "observed": "Reproduced 2026-11-13 with near-api-js 7.5.3: `callFunctionRaw` threw on a failed transaction and printed the raw outcome (about 100 lines). The package README states that Account throws on failure by default."
+    "observed": "Reproduced 2026-11-13 with near-api-js 7.5.3: `callFunctionRaw` threw on a failed transaction and printed the raw outcome (about 100 lines). The package README states that Account throws on failure by default. Narrowed 2026-11-13 after scanning public repos: the first version also fired on files that never reference near-api-js."
   }
 }

@@ -13,10 +13,19 @@ function plural(n, w) {
   return `${n} ${w}${n === 1 ? "" : "s"}`;
 }
 
-export function formatFinding(f, c) {
+export function formatFinding(f, c, { verbose = false } = {}) {
   const sev = { error: c.red("ERROR"), warn: c.yellow("WARN "), info: c.cyan("INFO ") }[f.severity];
+  const where = f.file ? `${f.file}${f.line ? ":" + f.line : ""}` : "";
+  if (!verbose) {
+    const lines = [`${sev} ${c.bold(f.id)}  ${where || f.title}`];
+    lines.push(`      ${f.message}`);
+    if (f.fix.steps[0]) lines.push(`      Fix:  ${f.fix.steps[0]}`);
+    if (f.fix.autofix) lines.push(`      Auto: ${c.green("near-doctor fix --safe")}  (${f.fix.autofix.description})`);
+    lines.push(c.dim(`      ${f.tier} · ${f.id === "UNKNOWN" ? "near-doctor submit" : `near-doctor show ${f.id}`}`));
+    return lines.join("\n");
+  }
   const lines = [`${sev} ${c.bold(f.id)}  ${f.title}`];
-  if (f.file) lines.push(c.dim(`      ${f.file}${f.line ? ":" + f.line : ""}`));
+  if (where) lines.push(c.dim(`      ${where}`));
   lines.push(`      ${f.message}`);
   lines.push(`      Why:  ${f.why}`);
   f.fix.steps.forEach((s, i) => lines.push(`      ${i === 0 ? "Fix:  " : "      "}${s}`));
@@ -26,7 +35,7 @@ export function formatFinding(f, c) {
   return lines.join("\n");
 }
 
-export function formatCheck(result, { color = false } = {}) {
+export function formatCheck(result, { color = false, verbose = false } = {}) {
   const c = palette(color);
   const s = result.summary;
   const total = s.error + s.warn + s.info;
@@ -36,9 +45,9 @@ export function formatCheck(result, { color = false } = {}) {
   if (!total) {
     out.push(c.green("No known friction found."));
   } else {
-    out.push(`${plural(total, "finding")}: ${s.error} error, ${s.warn} warning, ${s.info} info (${result.durationMs} ms)`);
+    out.push(`${plural(total, "finding")}: ${plural(s.error, "error")}, ${plural(s.warn, "warning")}, ${s.info} info (${result.durationMs} ms)`);
     out.push("");
-    for (const f of result.findings) out.push(formatFinding(f, c), "");
+    for (const f of result.findings) out.push(formatFinding(f, c, { verbose }), "");
   }
   if (result.skipped.length) {
     out.push(c.dim("Skipped:"));
@@ -76,6 +85,24 @@ export function formatExplain(matches, { color = false } = {}) {
     out.push("");
   }
   return out.join("\n");
+}
+
+export function formatRuleDetail(r) {
+  const L = [`${r.id}  ${r.title}`, `  status ${r.status} · tier ${r.tier} · severity ${r.severity} · used for: ${detectKind(r)}`, "", `  ${r.summary}`, ""];
+  if (r.evidence) {
+    L.push("  Evidence:");
+    for (const [k, v] of Object.entries(r.evidence)) L.push(`    ${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`);
+    L.push("");
+  }
+  if (r.fix?.steps?.length) {
+    L.push("  Fix:");
+    r.fix.steps.forEach((s, i) => L.push(`    ${i + 1}. ${s}`));
+    L.push("");
+  }
+  if (r.fix?.autofix) L.push(`  Auto-fix (near-doctor fix --safe): ${r.fix.autofix.description}`, "");
+  if (r.refs?.length) L.push("  References:", ...r.refs.map((u) => `    ${u}`), "");
+  L.push(`  Fixtures: fixtures/${r.id}/`);
+  return L.join("\n") + "\n";
 }
 
 const detectKind = (r) => (r.status === "log-only" ? "log only" : [r.detect ? "scan" : null, r.symptoms ? "explain" : null].filter(Boolean).join("+"));

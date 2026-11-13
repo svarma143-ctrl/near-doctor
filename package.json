@@ -25,7 +25,8 @@
   },
   "keywords": ["near", "doctor", "preflight", "cargo-near", "developer-experience", "agents"],
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test",
+    "verify": "node scripts/verify.mjs",
     "test:slow": "NEAR_DOCTOR_SLOW=1 node --test test/slow.test.mjs",
     "doctor": "node bin/near-doctor.mjs",
     "log": "node scripts/gen-log.mjs",

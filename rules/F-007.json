@@ -4,7 +4,7 @@
   "tier": "verified-here",
   "status": "active",
   "title": "Import from near-api-js that the installed version does not export (API drift)",
-  "summary": "near-api-js v7 removed or renamed many names from 0.x (WalletConnection, keyStores, connect, nearProviders). Tutorials and coding assistants still produce 0.x code, which fails at import or at first use. This check compares each named import with the exports of the version actually installed. JavaScript files only (TypeScript type-only imports would be false positives).",
+  "summary": "near-api-js v7 removed or renamed many names from 0.x (WalletConnection, keyStores, connect, nearProviders). Tutorials and coding assistants still produce 0.x code, which fails at import or at first use. This check compares each named import with the exports declared by the installed version's type declarations. It never executes the package (pass --allow-exec to load a package that ships no types).",
   "message": "`{name}` is imported from {package} in {file}:{line} but is not exported by the installed {package}@{version}. {hint}",
   "detect": {
     "kind": "detector",

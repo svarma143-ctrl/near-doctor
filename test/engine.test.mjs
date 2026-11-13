@@ -184,7 +184,7 @@ test("F-007 hints name the replacement and handle require() destructuring", asyn
   fs.writeFileSync(path.join(dir, "old.cjs"), 'const { keyStores, connect } = require("near-api-js");\n');
   const r = await runChecks({ root: dir, rules, only: ["F-007"], mock: { __strict: true } });
   const names = r.findings.map((f) => f.vars.name).sort();
-  assert.deepEqual(names, ["WalletConnection", "connect", "keyStores"]);
+  assert.deepEqual(names, ["WalletConnection", "WalletConnection", "connect", "keyStores"]); // app.mjs and app.ts
   assert.match(r.findings.find((f) => f.vars.name === "keyStores").message, /no KeyStore implementation/);
 });
 
@@ -203,4 +203,165 @@ test("net probe is off by default (no network without --net)", async () => {
   const r = await runChecks({ root: dir, rules, only: ["F-011"], mock: { __strict: true }, fetchImpl: async () => { called = true; return { text: async () => "" }; } });
   assert.equal(called, false);
   assert.equal(r.findings.length, 0);
+});
+
+// ------------------------------------------------------------------ F-007 safety
+test("F-007 never executes the package: exports come from type declarations", async () => {
+  const dir = copyFixture("F-007/repro");
+  const marker = path.join(dir, "EXECUTED");
+  fs.writeFileSync(path.join(dir, "node_modules/near-api-js/index.cjs"), `require("fs").writeFileSync(${JSON.stringify(marker)}, "x"); module.exports = {};`);
+  const r = await runChecks({ root: dir, rules, only: ["F-007"], mock: { __strict: true } });
+  assert.ok(r.findings.length >= 1);
+  assert.equal(fs.existsSync(marker), false, "the package was executed");
+  // TypeScript files are checked too; a type-only import (KeyPairString) is not a false positive
+  const ts = r.findings.filter((f) => f.file.endsWith(".ts"));
+  assert.deepEqual(ts.map((f) => f.vars.name), ["WalletConnection"]);
+});
+
+test("F-007: packages without types are skipped unless --allow-exec, which does execute them", async () => {
+  const dir = copyFixture("F-007/repro");
+  const pkgDir = path.join(dir, "node_modules/near-api-js");
+  fs.rmSync(path.join(pkgDir, "index.d.ts"));
+  fs.writeFileSync(path.join(pkgDir, "package.json"), '{"name":"near-api-js","version":"7.5.3","main":"index.cjs"}');
+  const marker = path.join(dir, "EXECUTED");
+  fs.writeFileSync(path.join(pkgDir, "index.cjs"), `require("fs").writeFileSync(${JSON.stringify(marker)}, "x"); module.exports = { Account: 1 };`);
+  const safe = await runChecks({ root: dir, rules, only: ["F-007"], mock: { __strict: true } });
+  assert.equal(safe.findings.length, 0);
+  assert.match(safe.skipped.map((s) => s.reason).join(" "), /--allow-exec/);
+  assert.equal(fs.existsSync(marker), false);
+  const loud = await runChecks({ root: dir, rules, only: ["F-007"], mock: { __strict: true }, allowExec: true });
+  assert.ok(loud.findings.length >= 1);
+  assert.equal(fs.existsSync(marker), true);
+});
+
+test("dtsExports follows export *, aliases and declarations", async () => {
+  const { dtsExports } = await import("../src/detectors.mjs");
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, "index.d.ts"), 'export * from "./a.js";\nexport * as ns from "./b";\nexport { x as Y, type Z } from "./c.js";\nexport declare function f(): void;\nexport default class D {}\n// export const hidden = 1;\n');
+  fs.writeFileSync(path.join(dir, "a.d.ts"), "export declare const fromA: number;\nexport type TA = string;\n");
+  assert.deepEqual([...dtsExports(path.join(dir, "index.d.ts"))].sort(), ["TA", "Y", "Z", "default", "f", "fromA", "ns"]);
+});
+
+// ------------------------------------------------------------------ regressions found by scanning public repos
+const nearLib = (attrs, impl = "") => `use near_sdk::near;
+#[near(contract_state)]
+#[derive(Default)]
+pub struct C {}
+${impl}#[near]
+impl C {
+    pub fn few(&self) {}
+${attrs}    pub fn many(&self, a: u8, b: u8, c: u8, d: u8, e: u8, f: u8, g: u8) {}
+}
+`;
+const withLib = (lib) => {
+  const dir = tmp();
+  fs.mkdirSync(path.join(dir, "src"));
+  fs.writeFileSync(path.join(dir, "Cargo.toml"), '[package]\nname = "c"\nversion = "0.1.0"\nedition = "2021"\n[dependencies]\nnear-sdk = "5"\n');
+  fs.writeFileSync(path.join(dir, "src/lib.rs"), lib);
+  return dir;
+};
+const ids = async (dir, only) => (await runChecks({ root: dir, rules, only: [only], mock: { __strict: true } })).findings.map((f) => f.id);
+
+test("F-004: flagged without an allow; a method-level allow silences it (verified with clippy); an impl-level allow does not", async () => {
+  assert.deepEqual(await ids(withLib(nearLib("")), "F-004"), ["F-004"]);
+  assert.deepEqual(await ids(withLib(nearLib("    #[allow(clippy::too_many_arguments)]\n")), "F-004"), []);
+  assert.deepEqual(await ids(withLib(nearLib("    #[payable]\n    #[allow(clippy::too_many_arguments)]\n")), "F-004"), []);
+  // an allow on the impl is NOT enough (verified with cargo near check --clippy)
+  const implAllow = nearLib("").replace("#[near]\nimpl", "#[near]\n#[allow(clippy::too_many_arguments)]\nimpl");
+  assert.deepEqual(await ids(withLib(implAllow), "F-004"), ["F-004"]);
+  // an allow on an earlier method must not leak onto a later one
+  const leak = nearLib("").replace("    pub fn few(&self) {}", "    #[allow(clippy::too_many_arguments)]\n    pub fn few(&self) {}");
+  assert.deepEqual(await ids(withLib(leak), "F-004"), ["F-004"]);
+});
+
+test("F-012: a file in a nested crate is checked against its own Cargo.toml, not the root one", async () => {
+  const dir = tmp();
+  fs.mkdirSync(path.join(dir, "src"));
+  fs.mkdirSync(path.join(dir, "tests/tests"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "Cargo.toml"), '[package]\nname = "root"\nversion = "0.1.0"\n[workspace]\nmembers = ["tests"]\n');
+  fs.writeFileSync(path.join(dir, "src/lib.rs"), "");
+  fs.writeFileSync(path.join(dir, "tests/Cargo.toml"), '[package]\nname = "t"\nversion = "0.1.0"\n[dependencies]\nanyhow = "1"\n');
+  fs.writeFileSync(path.join(dir, "tests/tests/a.rs"), "fn f() -> anyhow::Result<()> { Ok(()) }\n");
+  assert.deepEqual(await ids(dir, "F-012"), []);
+  // and it is still found when the nested crate really lacks it
+  fs.writeFileSync(path.join(dir, "tests/Cargo.toml"), '[package]\nname = "t"\nversion = "0.1.0"\n');
+  const found = (await runChecks({ root: dir, rules, only: ["F-012"], mock: { __strict: true } })).findings;
+  assert.equal(found.length, 1);
+  assert.equal(found[0].file, "tests/tests/a.rs");
+});
+
+test("F-005: needs max_gas, a balance read and an assert in the same test file", async () => {
+  const make = (body) => {
+    const dir = tmp();
+    fs.mkdirSync(path.join(dir, "tests"));
+    fs.writeFileSync(path.join(dir, "Cargo.toml"), '[package]\nname = "c"\nversion = "0.1.0"\n');
+    fs.writeFileSync(path.join(dir, "tests/t.rs"), body);
+    return dir;
+  };
+  const callMax = 'let r = a.call(id, "x").max_gas().transact().await?;\n';
+  assert.deepEqual(await ids(make(callMax + "let b = a.view_account().await?.balance;\nassert_eq!(b, 1);\n"), "F-005"), ["F-005"]);
+  assert.deepEqual(await ids(make(callMax + "assert!(r.is_success());\n"), "F-005"), [], "no balance read");
+  assert.deepEqual(await ids(make('let b = a.view_account().await?.balance;\nassert_eq!(b, 1);\n'), "F-005"), [], "no max_gas");
+  assert.deepEqual(await ids(make(callMax + "// the word balance in a comment\nassert!(r.is_success());\n"), "F-005"), [], "balance only mentioned");
+});
+
+test("F-006: only fires for files that use near-api-js", async () => {
+  const make = (body) => {
+    const dir = tmp();
+    fs.writeFileSync(path.join(dir, "a.mjs"), body);
+    fs.writeFileSync(path.join(dir, "package.json"), "{}");
+    return dir;
+  };
+  const call = 'const r = await x.callFunctionRaw({ contractId });\nif (r.status?.Failure) {}\n';
+  assert.deepEqual(await ids(make('import { Account } from "near-api-js";\n' + call), "F-006"), ["F-006"]);
+  assert.deepEqual(await ids(make('import { Other } from "some-other-sdk";\n' + call), "F-006"), []);
+});
+
+test("F-012: virtual workspace roots and non-target subdirectories are not flagged", async () => {
+  const mk = (rootToml, files) => {
+    const dir = tmp();
+    fs.writeFileSync(path.join(dir, "Cargo.toml"), rootToml);
+    for (const [f, body] of Object.entries(files)) {
+      fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true });
+      fs.writeFileSync(path.join(dir, f), body);
+    }
+    return dir;
+  };
+  const use = "fn f() -> anyhow::Result<()> { Ok(()) }\n";
+  const pkg = '[package]\nname = "p"\nversion = "0.1.0"\n';
+  assert.deepEqual(await ids(mk('[workspace]\nmembers = ["a"]\n', { "tests/a.rs": use }), "F-012"), [], "virtual workspace root");
+  assert.deepEqual(await ids(mk(pkg, { "tests/attacks/x.rs": use }), "F-012"), [], "subdir with no target root: never compiled");
+  assert.deepEqual(await ids(mk(pkg, { "tests/attacks/x.rs": use, "tests/attacks.rs": "mod x;\n" }), "F-012"), ["F-012"], "included by tests/attacks.rs");
+  assert.deepEqual(await ids(mk(pkg, { "tests/integration/main.rs": "mod dao;\n", "tests/integration/dao.rs": use }), "F-012"), ["F-012"], "tests/x/main.rs target");
+  assert.deepEqual(await ids(mk(pkg, { "tests/t.rs": use }), "F-012"), ["F-012"]);
+});
+
+test("F-006: provider.callFunction (a read-only view) is not flagged; account.callFunctionRaw is", async () => {
+  const make = (call) => {
+    const dir = tmp();
+    fs.writeFileSync(path.join(dir, "a.mjs"), `import { Account } from "near-api-js";\n${call}\nif (r.status?.Failure) {}\n`);
+    return dir;
+  };
+  assert.deepEqual(await ids(make("const r = await provider.callFunction(id, 'm', {});"), "F-006"), []);
+  assert.deepEqual(await ids(make("const r = await account.callFunctionRaw({ contractId });"), "F-006"), ["F-006"]);
+  assert.deepEqual(await ids(make("const r = await this.account.callFunction({ contractId });"), "F-006"), ["F-006"]);
+});
+
+test("F-005: the `.balance(...)` builder is not a balance read", async () => {
+  const dir = tmp();
+  fs.mkdirSync(path.join(dir, "tests"));
+  fs.writeFileSync(path.join(dir, "Cargo.toml"), '[package]\nname = "c"\nversion = "0.1.0"\n');
+  fs.writeFileSync(path.join(dir, "tests/t.rs"), 'let r = a.call(id, "x").max_gas().transact().await?;\nlet p = Patch::new().balance(NearToken::from_near(1));\nassert!(r.is_success());\n');
+  assert.deepEqual(await ids(dir, "F-005"), []);
+});
+
+test("F-006: provider.callFunctionRaw and identifiers like DemoFailure are not flagged", async () => {
+  const make = (body) => {
+    const dir = tmp();
+    fs.writeFileSync(path.join(dir, "a.mjs"), `import { Account } from "near-api-js";\n${body}\n`);
+    return dir;
+  };
+  assert.deepEqual(await ids(make("const r = await provider.callFunctionRaw({ contractId });\nif (r.status?.Failure) {}"), "F-006"), []);
+  assert.deepEqual(await ids(make("class DemoFailure extends Error {}\nawait signer.callFunctionRaw({ contractId });"), "F-006"), []);
+  assert.deepEqual(await ids(make("const r = await new Account(a, b, c).callFunctionRaw({ contractId });\nif ('Failure' in r.status) {}"), "F-006"), ["F-006"]);
 });

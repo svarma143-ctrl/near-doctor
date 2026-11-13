@@ -21,7 +21,11 @@ test("check: reports a finding with file:line and exits 1 on errors", async () =
   assert.equal(r.code, 1);
   assert.match(r.out, /ERROR\s+F-001/);
   assert.match(r.out, /src\/lib\.rs:\d+/);
-  assert.match(r.out, /Evidence: verified-here/);
+  assert.match(r.out, /verified-here · near-doctor show F-001/);
+  assert.ok(!/Why:/.test(r.out), "default output is compact");
+  const v = await run([path.join(FIXTURES, "F-001/repro"), "--only", "F-001", "--verbose"]);
+  assert.match(v.out, /Why:/);
+  assert.match(v.out, /Evidence: verified-here/);
 });
 
 test("check: clean control prints the all-clear and exits 0", async () => {
@@ -176,4 +180,14 @@ test("misplaced or extra arguments are rejected instead of silently ignored", as
   const extra = await run([dir, "another-dir"]);
   assert.equal(extra.code, 2);
   assert.match(extra.err, /unexpected argument "another-dir"/);
+});
+
+test("show prints the full record with evidence; unknown ids are an error", async () => {
+  const r = await run(["show", "f-001"]);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /F-001 {2}Helper function/);
+  assert.match(r.out, /Evidence:\n {4}observed: Reproduced 2026-11-13/);
+  assert.match(r.out, /Fixtures: fixtures\/F-001\//);
+  assert.equal(JSON.parse((await run(["show", "R-001", "--json"])).out).status, "historical");
+  assert.equal((await run(["show", "F-999"])).code, 2);
 });

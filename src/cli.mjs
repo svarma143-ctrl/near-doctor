@@ -4,14 +4,14 @@ import path from "node:path";
 import { DEFAULT_RULES_DIR, VERSION, publicResult, runChecks } from "./engine.mjs";
 import { applyFixes } from "./fix.mjs";
 import { redact } from "./redact.mjs";
-import { formatCheck, formatExplain, formatRulesList, renderSteps, rulesMarkdown } from "./report.mjs";
+import { formatCheck, formatExplain, formatRuleDetail, formatRulesList, renderSteps, rulesMarkdown } from "./report.mjs";
 import { loadRules, validateRules } from "./rules.mjs";
 import { matchSymptoms } from "./symptoms.mjs";
 import { makeRunner } from "./util.mjs";
 import { inspectWasm } from "./wasm.mjs";
 
-const COMMANDS = new Set(["check", "explain", "fix", "inspect", "submit", "rules", "help", "version"]);
-const BOOL = new Set(["json", "deep", "clippy", "net", "historical", "safe", "dry-run", "markdown", "check", "no-color", "help", "version"]);
+const COMMANDS = new Set(["check", "explain", "fix", "inspect", "show", "submit", "rules", "help", "version"]);
+const BOOL = new Set(["verbose", "allow-exec", "json", "deep", "clippy", "net", "historical", "safe", "dry-run", "markdown", "check", "no-color", "help", "version"]);
 const VALUE = new Set(["rpc", "only", "ignore", "fail-on", "rules", "from", "out", "command"]);
 
 export const HELP = `near-doctor ${VERSION}: preflight checks and an evidence-backed friction log for NEAR developers
@@ -22,12 +22,15 @@ Usage
   near-doctor fix --safe          apply deterministic, allowlisted fixes, then re-check
   near-doctor inspect FILE.wasm   show wasm sections and target features
   near-doctor submit              build a redacted friction report (markdown) to paste into a GitHub issue
+  near-doctor show F-001          the full record for one friction entry, with evidence
   near-doctor rules               list the friction log (--markdown, --json, --check)
 
 Options
+  --verbose         full explanation per finding (why, every fix step, references)
   --json            machine-readable output (agent-ready: includes tasks and acceptance commands)
   --deep            also run \`cargo near check\` and explain its output
   --clippy          with --deep, run clippy instead of check
+  --allow-exec      let F-007 load packages without type declarations with require() (runs their code)
   --net             also probe public RPC latency (the only network access; off by default)
   --rpc URL         RPC to probe (default https://rpc.testnet.near.org)
   --only IDS        comma-separated rule ids to run, e.g. F-001,F-004
@@ -88,7 +91,7 @@ export async function main(argv, io = {}) {
   const { flags, positionals } = parsed;
   let command = "check";
   if (positionals.length && COMMANDS.has(positionals[0])) command = positionals.shift();
-  const extra = positionals.slice(command === "submit" || command === "inspect" || command === "explain" || command === "fix" || command === "check" ? 1 : 0);
+  const extra = positionals.slice(command === "submit" || command === "inspect" || command === "explain" || command === "fix" || command === "check" || command === "show" ? 1 : 0);
   if (extra.length && !flags.help && !flags.version) {
     const hint = COMMANDS.has(extra[0]) ? ` (did you mean \`near-doctor ${extra[0]} <path>\`? the command comes first)` : "";
     err(`near-doctor: unexpected argument "${extra[0]}"${hint}\n`);
@@ -151,6 +154,18 @@ export async function main(argv, io = {}) {
       return 0;
     }
 
+    if (command === "show") {
+      const id = (positionals[0] || "").toUpperCase();
+      const rule = rules.find((r) => r.id === id);
+      if (!rule) {
+        err(`near-doctor show: no friction entry "${positionals[0] ?? ""}". Try \`near-doctor rules\`.\n`);
+        return 2;
+      }
+      const { __file, ...pub } = rule;
+      out(flags.json ? JSON.stringify(pub, null, 2) + "\n" : formatRuleDetail(rule));
+      return 0;
+    }
+
     if (command === "explain") {
       const text = await readInput(flags, io);
       if (text == null) {
@@ -191,11 +206,11 @@ export async function main(argv, io = {}) {
     }
 
     const root = positionals[0] || ".";
-    const base = { root, rules, only, ignore, historical: flags.historical, deep: flags.deep, clippy: flags.clippy, net: flags.net, rpc: flags.rpc, runner, fetchImpl: io.fetchImpl, now: io.now };
+    const base = { root, rules, only, ignore, historical: flags.historical, deep: flags.deep, clippy: flags.clippy, allowExec: flags["allow-exec"], net: flags.net, rpc: flags.rpc, runner, fetchImpl: io.fetchImpl, now: io.now };
 
     if (command === "check") {
       const result = await runChecks(base);
-      out(flags.json ? JSON.stringify(publicResult(result), null, 2) + "\n" : formatCheck(result, { color }));
+      out(flags.json ? JSON.stringify(publicResult(result), null, 2) + "\n" : formatCheck(result, { color, verbose: flags.verbose }));
       return exitFor(result.summary);
     }
 

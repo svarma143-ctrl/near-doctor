@@ -7,6 +7,93 @@ import { scanNear, stripRust } from "./rust.mjs";
 const SIZE_LIMIT = 1_000_000;
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+
+/** node_modules/<pkg> above the importing file (path lookup only; nothing is executed). */
+function findPackageDir(root, relFile, pkg) {
+  let dir = path.dirname(path.join(root, relFile));
+  for (;;) {
+    const candidate = path.join(dir, "node_modules", pkg);
+    if (fs.existsSync(path.join(candidate, "package.json"))) return candidate;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+function dtsEntry(pkgDir, pj) {
+  const fromExports = (e) => {
+    if (!e) return null;
+    if (typeof e === "string") return null;
+    if (e.types) return e.types;
+    for (const k of ["import", "require", "default", "."]) {
+      const r = fromExports(e[k]);
+      if (r) return r;
+    }
+    return null;
+  };
+  const cands = [pj.types, pj.typings, fromExports(pj.exports?.["."] ?? pj.exports)];
+  if (pj.main) cands.push(pj.main.replace(/\.[cm]?js$/, ".d.ts"));
+  cands.push("index.d.ts");
+  for (const c of cands) if (c && fs.existsSync(path.join(pkgDir, c))) return path.join(pkgDir, c);
+  return null;
+}
+
+function stripTsComments(t) {
+  return t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+}
+
+/** Names exported by a .d.ts entry, following relative `export *` and `export {..} from`. */
+export function dtsExports(file, seen = new Set()) {
+  const names = new Set();
+  if (seen.has(file) || !fs.existsSync(file)) return names;
+  seen.add(file);
+  const text = stripTsComments(fs.readFileSync(file, "utf8"));
+  const resolveRel = (spec) => {
+    const base = path.resolve(path.dirname(file), spec);
+    for (const c of [base, base.replace(/\.[cm]?js$/, ".d.ts"), base + ".d.ts", path.join(base, "index.d.ts")]) {
+      if (fs.existsSync(c) && fs.statSync(c).isFile()) return c;
+    }
+    return null;
+  };
+  for (const m of text.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}/g)) {
+    for (const raw of m[1].split(",")) {
+      const n = raw.trim().replace(/^type\s+/, "").split(/\s+as\s+/).pop().trim();
+      if (n) names.add(n);
+    }
+  }
+  for (const m of text.matchAll(/export\s*\*\s*(?:as\s+([\w$]+)\s*)?from\s*["']([^"']+)["']/g)) {
+    if (m[1]) names.add(m[1]);
+    else if (m[2].startsWith(".")) {
+      const r = resolveRel(m[2]);
+      if (r) for (const n of dtsExports(r, seen)) names.add(n);
+    }
+  }
+  for (const m of text.matchAll(/export\s+(?:declare\s+)?(?:abstract\s+)?(?:class|function\*?|const|let|var|interface|type|enum|namespace)\s+([A-Za-z_$][\w$]*)/g)) names.add(m[1]);
+  if (/export\s+default\b/.test(text)) names.add("default");
+  return names;
+}
+
+function packageExports(pkgDir, pkg, relFile, ctx) {
+  const pj = JSON.parse(fs.readFileSync(path.join(pkgDir, "package.json"), "utf8"));
+  const version = pj.version || "unknown";
+  const entry = dtsEntry(pkgDir, pj);
+  if (entry) {
+    const text = fs.readFileSync(entry, "utf8");
+    if (/^\s*export\s*=/m.test(text)) return { reason: "type declarations use `export =`; pass --allow-exec to load the package instead", version };
+    const names = dtsExports(entry);
+    if (names.size) return { names, version, via: "types" };
+  }
+  if (ctx.opts.allowExec) {
+    try {
+      const req = createRequire(path.join(ctx.root, relFile));
+      return { names: new Set(Object.keys(req(pkg))), version, via: "exec" };
+    } catch (e) {
+      return { reason: `could not load: ${String(e.message).split("\n")[0]}`, version };
+    }
+  }
+  return { reason: "no type declarations found; pass --allow-exec to load the package (this runs its code)", version };
+}
+
 const rustFiles = (ctx) => ctx.files.filter((f) => f.endsWith(".rs"));
 
 function crateRootFor(ctx, file) {
@@ -82,7 +169,7 @@ export const DETECTORS = {
       const allowed = s.allowsTooManyArgs || /#!\[\s*allow\([^\]]*too_many_arguments/.test(stripRust(rootText));
       if (allowed) continue;
       for (const m of s.methods) {
-        if (m.params > max) {
+        if (m.params > max && !m.allowed) {
           hits.push({
             file: f,
             line: m.line,
@@ -101,14 +188,31 @@ export const DETECTORS = {
     const usage = new RegExp(params.usage || `\\b${escapeRe(name)}::`);
     const declared = new RegExp(`^\\s*${escapeRe(name)}\\s*[=.]|\\[(?:dev-|build-)?dependencies\\.${escapeRe(name)}\\]`, "m");
     const hits = [];
+    // A file belongs to its nearest enclosing crate: a nested crate (for example tests/Cargo.toml) is checked
+    // against its own manifest, not the root one.
+    const prefixes = ctx.crates.map((c) => (c.dir ? c.dir + "/" : ""));
+    const owner = (f) => prefixes.reduce((best, p) => (f.startsWith(p) && p.length > best.length ? p : best), "");
+    const all = rustFiles(ctx);
+    const fileSet = new Set(all);
     for (const c of ctx.crates) {
       const prefix = c.dir ? c.dir + "/" : "";
       const manifest = ctx.read(c.manifest) || "";
+      if (!/^\s*\[package\]/m.test(manifest)) continue; // a virtual workspace root has no test targets
       if (declared.test(manifest)) continue;
-      for (const f of rustFiles(ctx)) {
-        if (!f.startsWith(prefix)) continue;
+      // Cargo auto-discovers tests/*.rs and tests/*/main.rs (same for benches and examples); a file in a
+      // deeper directory only compiles when its target root exists next to it (tests/x.rs or tests/x/main.rs).
+      const compiled = (rel) => {
+        const m = /^(tests|benches|examples)\/(.+)$/.exec(rel);
+        if (!m) return false;
+        const parts = m[2].split("/");
+        if (parts.length === 1) return true;
+        if (parts.length === 2 && parts[1] === "main.rs") return true;
+        return fileSet.has(prefix + `${m[1]}/${parts[0]}.rs`) || fileSet.has(prefix + `${m[1]}/${parts[0]}/main.rs`);
+      };
+      for (const f of all) {
+        if (!f.startsWith(prefix) || owner(f) !== prefix) continue;
         const rel = f.slice(prefix.length);
-        if (!/^(tests|benches|examples)\//.test(rel)) continue;
+        if (!compiled(rel)) continue;
         const text = ctx.read(f);
         if (!text) continue;
         const clean = stripRust(text);
@@ -127,7 +231,11 @@ export const DETECTORS = {
     return hits;
   },
 
-  /** Named imports from a JS package that the installed version does not export. */
+  /**
+   * Named imports from a package that the installed version does not export. Exports are read from
+   * the package's type declarations (no code is executed). With --allow-exec, packages without
+   * types are loaded with require() instead.
+   */
   "js-import-exports": (ctx, params) => {
     const pkg = params.package;
     const hints = params.hints || {};
@@ -136,7 +244,7 @@ export const DETECTORS = {
     const cache = new Map();
     const hits = [];
     for (const f of ctx.files) {
-      if (!/\.(m?js|cjs|jsx)$/.test(f)) continue; // TS type-only imports would be false positives
+      if (!/\.(m?[jt]sx?|c[jt]s)$/.test(f) || f.endsWith(".d.ts")) continue;
       const text = ctx.read(f);
       if (!text || text.length > SIZE_LIMIT || !text.includes(pkg)) continue;
       const found = [];
@@ -151,35 +259,20 @@ export const DETECTORS = {
         }
       }
       if (!found.length) continue;
-      const req = createRequire(path.join(ctx.root, f));
-      let info;
-      try {
-        const resolved = req.resolve(pkg);
-        if (!cache.has(resolved)) {
-          const exp = req(pkg);
-          let dir = path.dirname(resolved);
-          let version = "unknown";
-          for (let i = 0; i < 6; i++) {
-            const pj = path.join(dir, "package.json");
-            if (fs.existsSync(pj)) {
-              const j = JSON.parse(fs.readFileSync(pj, "utf8"));
-              if (j.name === pkg) {
-                version = j.version;
-                break;
-              }
-            }
-            dir = path.dirname(dir);
-          }
-          cache.set(resolved, { exp, version });
-        }
-        info = cache.get(resolved);
-      } catch (e) {
-        ctx.skipped.push({ id: "F-007", reason: `${pkg} not installed or not loadable from ${f} (${String(e.message).split("\n")[0]})` });
+      const pkgDir = findPackageDir(ctx.root, f, pkg);
+      if (!pkgDir) {
+        ctx.skipped.push({ id: "F-007", reason: `${pkg} is not installed (no node_modules/${pkg} above ${f})` });
+        continue;
+      }
+      if (!cache.has(pkgDir)) cache.set(pkgDir, packageExports(pkgDir, pkg, f, ctx));
+      const info = cache.get(pkgDir);
+      if (!info.names) {
+        ctx.skipped.push({ id: "F-007", reason: `${pkg}: ${info.reason}` });
         continue;
       }
       const li = lineIndex(text);
       for (const { name, index } of found) {
-        if (name in info.exp) continue;
+        if (info.names.has(name)) continue;
         hits.push({
           file: f,
           line: li(index),

@@ -129,18 +129,23 @@ export function scanNear(src) {
   let pendingItem = null;
   let pendingName = null;
   let pendingPub = false;
+  let pendingAllow = false;
   const top = () => stack[stack.length - 1];
   const reset = () => {
     pendingItem = null;
     pendingNear = false;
     pendingPub = false;
     pendingName = null;
+    pendingAllow = false;
   };
   let m;
   while ((m = re.exec(clean))) {
     const t = m[0];
     if (t[0] === "#") {
       if (/^#\[\s*(near|near_bindgen)\b/.test(t)) pendingNear = true;
+      // An outer allow on the method itself silences clippy's too_many_arguments on the generated wrapper
+      // (verified); one on the impl does not, and reset() clears it at the impl's opening brace.
+      if (/^#\[\s*(?:allow|expect)\s*\([^\]]*too_many_arguments/.test(t)) pendingAllow = true;
       continue;
     }
     if (t === "pub") {
@@ -186,7 +191,7 @@ export function scanNear(src) {
       const namePos = re.lastIndex + rest.indexOf(name);
       const params = parseParams(clean, namePos + name.length);
       if (par && par.kind === "impl" && par.near && pendingPub) {
-        methods.push({ name, params: params ? params.count : 0, line: li(namePos), module: par.module.join("::") });
+        methods.push({ name, params: params ? params.count : 0, line: li(namePos), module: par.module.join("::"), allowed: pendingAllow });
       } else if (!par || par.kind === "mod") {
         freeFns.push({ name, line: li(namePos), module: (par ? par.module : []).join("::") });
       }

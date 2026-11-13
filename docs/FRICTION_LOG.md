@@ -12,7 +12,7 @@ Evidence tiers: **verified-here** = reproduced by the maintainers; **reported** 
 | F-002 | active | verified-here | error | explain | Plain `cargo check` is rejected on a contract crate |
 | F-003 | active | verified-here | info | explain | near-workspaces wraps the real compile error in a long, misleading dump |
 | F-004 | active | verified-here | warn | scan+explain | clippy::too_many_arguments fires on #[near] method wrappers |
-| F-005 | active | verified-here | warn | scan | Sandbox balance assertions race with gas refunds when using max_gas() |
+| F-005 | active | verified-here | info | scan | Sandbox balance assertions race with gas refunds when using max_gas() |
 | F-006 | active | verified-here | warn | scan | near-api-js callFunction throws on failed transactions (and prints the whole outcome) |
 | F-007 | active | verified-here | error | scan | Import from near-api-js that the installed version does not export (API drift) |
 | F-008 | active | verified-here | error | scan | `near dev-deploy` is used but the Node near CLI no longer has it |
@@ -108,22 +108,22 @@ Fix:
 
 - Status: active; tier: verified-here; severity: warn
 
-A public #[near] method with more than 7 parameters (counting self) makes clippy fail with `too many arguments` on code the macro generates. An allow attribute on the impl did not silence it; a crate-level allow did.
+A public #[near] method with more than 7 parameters (counting self) makes clippy warn `too many arguments` on code the macro generates (an error under `-D warnings`). An allow on the method or at crate level silences it; an allow on the impl does not.
 
 Evidence:
-- observed: Reproduced 2026-11-13 (macOS 15 arm64, rustc 1.100.0, cargo-near 0.23.0, near-sdk 5.30.1, node 26.12.1): `cargo clippy -D warnings` failed with 'too many arguments (8/7)' on a #[near] impl; an allow on the impl did not help; a crate-level allow did.
+- observed: Reproduced 2026-11-13 (macOS 15 arm64, rustc 1.100.0, cargo-near 0.23.0, near-sdk 5.30.1): `cargo near check --clippy` warned 'too many arguments (8/7)' on a #[near] method. Still warned with an allow above the #[near] impl and with an allow below #[near] above the impl. No warning with an allow on the method, nor with a crate-level allow. Corrected 2026-11-13 after scanning public repos: the first version of this rule flagged methods that already carry a method-level allow.
 
 Fix:
-1. Add `#![allow(clippy::too_many_arguments)]` at the top of the crate root (after any `//!` docs) with a comment; an attribute on the impl does not silence the generated wrapper.
+1. Add `#[allow(clippy::too_many_arguments)]` on the method itself, or `#![allow(clippy::too_many_arguments)]` at the top of the crate root (after any `//!` docs). An attribute on the impl does not silence the generated wrapper.
 2. Or group the arguments into a struct if you can change the JSON interface.
 
 Auto-fix: `rust-crate-attr`: Add a crate-level #![allow(clippy::too_many_arguments)] to the crate root
 
 ## F-005: Sandbox balance assertions race with gas refunds when using max_gas()
 
-- Status: active; tier: verified-here; severity: warn
+- Status: active; tier: verified-here; severity: info
 
-Prepaid gas from `.max_gas()` is refunded asynchronously, so a balance read right after a transaction can be off by up to about 1 NEAR and the refund lands later.
+Prepaid gas from `.max_gas()` is refunded asynchronously, so a balance read right after a transaction can be off by up to about 1 NEAR and the refund lands later. This check is a heuristic: it fires on test files that use `.max_gas()`, read a balance and contain an assert, without proving the assert depends on that balance. Severity is info because a scan of public repos found roughly a third of hits in a small sample were unrelated reads.
 
 Evidence:
 - observed: Reproduced 2026-11-13 (macOS 15 arm64, rustc 1.100.0, cargo-near 0.23.0, near-sdk 5.30.1, node 26.12.1): with max_gas the borrower balance delta read 11.0007 NEAR instead of 10 NEAR right after the transaction; explicit 60 Tgas plus fast_forward(5) gave stable results.
@@ -137,10 +137,10 @@ Fix:
 
 - Status: active; tier: verified-here; severity: warn
 
-In near-api-js v7, `callFunction` and `callFunctionRaw` throw when the transaction fails, and the thrown error prints the entire raw outcome (about 100 lines). Code that expects to inspect `Failure` afterwards never gets the chance.
+In near-api-js v7, `callFunction` and `callFunctionRaw` throw when the transaction fails, and the thrown error prints the entire raw outcome (about 100 lines). Code that expects to inspect `Failure` afterwards never gets the chance. Calls on a provider (`provider.callFunction`, `provider.callFunctionRaw`) are read-only views and are not flagged; identifiers that merely contain the word, such as `DemoFailure`, do not count as inspecting `Failure`.
 
 Evidence:
-- observed: Reproduced 2026-11-13 with near-api-js 7.5.3: `callFunctionRaw` threw on a failed transaction and printed the raw outcome (about 100 lines). The package README states that Account throws on failure by default.
+- observed: Reproduced 2026-11-13 with near-api-js 7.5.3: `callFunctionRaw` threw on a failed transaction and printed the raw outcome (about 100 lines). The package README states that Account throws on failure by default. Narrowed 2026-11-13 after scanning public repos: the first version also fired on files that never reference near-api-js.
 
 Fix:
 1. To record an expected failure use `account.signAndSendTransaction({ receiverId, actions: [actions.functionCall(...)], waitUntil: 'FINAL', throwOnFailure: false })` and inspect `status.Failure` and each `receipts_outcome[].outcome.status.Failure`.
@@ -153,7 +153,7 @@ References:
 
 - Status: active; tier: verified-here; severity: error
 
-near-api-js v7 removed or renamed many names from 0.x (WalletConnection, keyStores, connect, nearProviders). Tutorials and coding assistants still produce 0.x code, which fails at import or at first use. This check compares each named import with the exports of the version actually installed. JavaScript files only (TypeScript type-only imports would be false positives).
+near-api-js v7 removed or renamed many names from 0.x (WalletConnection, keyStores, connect, nearProviders). Tutorials and coding assistants still produce 0.x code, which fails at import or at first use. This check compares each named import with the exports declared by the installed version's type declarations. It never executes the package (pass --allow-exec to load a package that ships no types).
 
 Evidence:
 - observed: Checked 2026-11-13: the exports of near-api-js 7.5.3 include Account, JsonRpcProvider, KeyPair, KeyPairSigner, Signer and actions, but not WalletConnection, nearProviders, keyStores, connect or Near. The migration guide states that no KeyStore implementation is included.
