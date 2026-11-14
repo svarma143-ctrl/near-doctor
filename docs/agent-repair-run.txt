@@ -1,0 +1,75 @@
+# near-doctor agent-repair: live run
+date_utc: 2026-11-14T23:19:41Z
+repo_commit: 26c5424
+agent: codex (codex-cli 0.169.0)
+node: v26.12.1
+cargo-near: cargo-near-near 0.23.0
+os: Darwin arm64
+command: node scripts/agent-repair.mjs
+
+Disposable project copy: /var/folders/d6/jjrskxsd3dq730z9z7lvcxg00000gn/T/near-doctor-agent-repair-DSVkyf
+Reproduced F-001: Free function `amount_owed` (line 75) collides with the public #[near] method of the same name (line 46).
+Agent: codex (codex-cli 0.169.0)
+
+Agent response:
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -44,7 +44,7 @@
+ 
+     /// What `who` is owed after the jar's fee.
+     pub fn amount_owed(&self, who: AccountId) -> U128 {
+-        U128(amount_owed(self.tips.get(&who).copied().unwrap_or(0), self.fee_bps))
++        U128(compute_amount_owed(self.tips.get(&who).copied().unwrap_or(0), self.fee_bps))
+     }
+ 
+     pub fn configure(
+@@ -72,7 +72,7 @@
+     }
+ }
+ 
+-fn amount_owed(gross: u128, fee_bps: u32) -> u128 {
++fn compute_amount_owed(gross: u128, fee_bps: u32) -> u128 {
+     gross - gross * fee_bps as u128 / 10_000
+ }
+ 
+@@ -82,6 +82,6 @@
+ 
+     #[test]
+     fn fee_is_deducted() {
+-        assert_eq!(amount_owed(10_000, 100), 9_900);
++        assert_eq!(compute_amount_owed(10_000, 100), 9_900);
+     }
+ }
+
+Changed files: src/lib.rs
+
+Diff for src/lib.rs:
+     /// What `who` is owed after the jar's fee.
+     pub fn amount_owed(&self, who: AccountId) -> U128 {
+-        U128(amount_owed(self.tips.get(&who).copied().unwrap_or(0), self.fee_bps))
++        U128(compute_amount_owed(self.tips.get(&who).copied().unwrap_or(0), self.fee_bps))
+     }
+ 
+...
+ }
+ 
+-fn amount_owed(gross: u128, fee_bps: u32) -> u128 {
++fn compute_amount_owed(gross: u128, fee_bps: u32) -> u128 {
+     gross - gross * fee_bps as u128 / 10_000
+ }
+...
+     #[test]
+     fn fee_is_deducted() {
+-        assert_eq!(amount_owed(10_000, 100), 9_900);
++        assert_eq!(compute_amount_owed(10_000, 100), 9_900);
+     }
+ }
+
+PASS: near-doctor --only F-001 --json — no F-001 finding remains.
+
+Running cargo near check...
+PASS: cargo near check
+Running cargo test --lib...
+PASS: cargo test --lib
+exit_code: 0
+elapsed_seconds: 49
