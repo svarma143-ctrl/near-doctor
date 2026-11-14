@@ -38,7 +38,7 @@ Do this, see that:
    had false positives and were fixed.
 
 **What is not done:** it is not an autonomous fixing platform. The agent loop ([below](#agent-repair-harness-proof-of-concept-one-rule))
-is a harness for one rule and has no recorded live run yet. Everything was verified on one machine (macOS arm64). See
+is a harness for one rule with one recorded live run ([transcript](docs/agent-repair-run.txt)). Everything was verified on one machine (macOS arm64). See
 [Limitations](#limitations) and the [roadmap](#where-this-goes).
 
 ## Use it on your project
@@ -197,7 +197,7 @@ get a task and an acceptance command for it. Maintainers stay in the loop on pur
 | Phase | Status |
 | --- | --- |
 | 1. Trusted local doctor: fast scan, evidence tiers, fixture-gated rules | **Built** (CLI, 18 records, CI, npm) |
-| 2. Verified agent repairs: finding to patch to acceptance check, with approval | **Started** (harness for one rule; next: more rules, recorded live runs, an approval step, branch mode) |
+| 2. Verified agent repairs: finding to patch to acceptance check, with approval | **Started** (harness for one rule, one recorded live run; next: more rules, repeated runs, an approval step, branch mode) |
 | 3. Community intake: a stable report format, de-duplication, reproduction queue | **Partly built** (issue form and triage workflow work; the report format is not versioned yet) |
 | 4. Versioned rule packs with provenance and staleness marks | Not built |
 | 5. Other chains and toolchains | Only after phases 1 to 4 show value |
@@ -250,8 +250,7 @@ What is enforced, and what is not:
 - **Cost:** a run uses your agent account's quota and sends the demo contract's source to that provider.
 
 Status: the harness, the diff filter, the acceptance check and the environment filter are covered by tests that use a
-mock agent. **A transcript of a live-agent run is not included in this repository yet**, so treat the live path as
-unproven until one is added. Requires Node 20+ and a logged-in agent CLI (plus Rust and `cargo-near` unless
+mock agent. **One live run with Codex CLI 0.169.0 passed on 14 Nov 2026 (49 s):** Codex renamed the helper, near-doctor no longer reported F-001, and `cargo near check` and `cargo test --lib` passed. The full transcript is [docs/agent-repair-run.txt](docs/agent-repair-run.txt). One run is not a benchmark; the Claude Code path has not been run live. Requires Node 20+ and a logged-in agent CLI (plus Rust and `cargo-near` unless
 `--no-cargo`). It is one rule, not a general autonomous fixer.
 
 ## Development
