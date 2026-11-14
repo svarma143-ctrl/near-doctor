@@ -75,10 +75,15 @@ export function stripRust(src) {
 }
 
 /** Count top-level parameters of the first parenthesised list at/after `from`. */
+// A real parameter list is nowhere near this long. Capping the look-ahead keeps a malformed or generated file
+// (unbalanced parentheses, thousands of `fn` tokens) from making the scan quadratic.
+const MAX_PARAMS_SPAN = 8_000;
+
 function parseParams(clean, from) {
+  const limit = Math.min(clean.length, from + MAX_PARAMS_SPAN);
   let i = from;
   let angle = 0;
-  while (i < clean.length) {
+  while (i < limit) {
     const c = clean[i];
     if (c === "<") angle++;
     else if (c === ">" && clean[i - 1] !== "-") angle = Math.max(0, angle - 1);
@@ -92,7 +97,7 @@ function parseParams(clean, from) {
   let count = 0;
   let seen = false;
   const start = i;
-  for (; i < clean.length; i++) {
+  for (; i < limit; i++) {
     const c = clean[i];
     if (c === "(" || c === "[") depth++;
     else if (c === ")" || c === "]") {
@@ -108,7 +113,7 @@ function parseParams(clean, from) {
       seen = false;
       continue;
     }
-    if (depth >= 1 && !/\s/.test(c) && i !== start) seen = true;
+    if (depth >= 1 && c !== " " && c !== "\n" && c !== "\t" && c !== "\r" && i !== start) seen = true;
   }
   return null;
 }

@@ -24,7 +24,7 @@ Usage
   near-doctor explain --from FILE paste tool output (or --from -) and get the known cause and fix
   near-doctor fix --safe          apply deterministic, allowlisted fixes, then re-check
   near-doctor inspect FILE.wasm   show wasm sections and target features
-  near-doctor submit              build a redacted friction report (markdown) to paste into a GitHub issue
+  near-doctor submit              build a friction report (markdown) for a GitHub issue; secrets are removed best-effort, re-read it first
   near-doctor show F-001          the full record for one friction entry, with evidence
   near-doctor rules               list the friction log (--markdown, --json, --check)
 
@@ -283,7 +283,7 @@ export async function main(argv, io = {}) {
         "",
         result.findings.length ? result.findings.map((f) => `- ${f.id} ${f.title}${f.file ? ` (${redact(f.file)}${f.line ? ":" + f.line : ""})` : ""}`).join("\n") : "- none",
         "",
-        "_Generated locally by `near-doctor submit`. Secrets and home paths were redacted automatically; please re-read before posting._",
+        "_Generated locally by `near-doctor submit`. Common secret formats and home paths were removed automatically (best effort, not a guarantee); please re-read before posting._",
         "",
       ].join("\n");
       if (flags.out) {

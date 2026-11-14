@@ -205,20 +205,57 @@ function changedFiles(before, after) {
     .sort();
 }
 
+/**
+ * Minimal line diff (longest common subsequence) so the harness needs nothing but Node to show a change.
+ * Prints changed lines with `context` unchanged lines around them. Falls back to a message for very large files.
+ */
+export function lineDiff(before, after, context = 2) {
+  const A = before.split("\n");
+  const B = after.split("\n");
+  const n = A.length;
+  const m = B.length;
+  if (n * m > 4_000_000) return `(file too large to diff: ${n} -> ${m} lines)`;
+  const L = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  }
+  const ops = [];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (A[i] === B[j]) ops.push([" ", A[i++]]), j++;
+    else if (L[i + 1][j] >= L[i][j + 1]) ops.push(["-", A[i++]]);
+    else ops.push(["+", B[j++]]);
+  }
+  while (i < n) ops.push(["-", A[i++]]);
+  while (j < m) ops.push(["+", B[j++]]);
+  const keep = new Array(ops.length).fill(false);
+  ops.forEach(([op], k) => {
+    if (op !== " ") for (let x = Math.max(0, k - context); x <= Math.min(ops.length - 1, k + context); x++) keep[x] = true;
+  });
+  const out = [];
+  let gap = false;
+  ops.forEach(([op, text], k) => {
+    if (!keep[k]) {
+      gap = true;
+      return;
+    }
+    if (gap && out.length) out.push("...");
+    gap = false;
+    out.push(`${op}${text}`);
+  });
+  return out.join("\n");
+}
+
 function showDiff(beforeRoot, workspace, files, log) {
   for (const file of files) {
-    if (!beforeRoot || !fs.existsSync(path.join(beforeRoot, file)) || !fs.existsSync(path.join(workspace, file))) {
+    const before = beforeRoot && path.join(beforeRoot, file);
+    const after = path.join(workspace, file);
+    if (!before || !fs.existsSync(before) || !fs.existsSync(after)) {
       log(`\nChanged file: ${file} (added or removed)`);
       continue;
     }
-    const r = spawnSync("git", ["diff", "--no-index", "--no-prefix", "--", path.join(beforeRoot, file), path.join(workspace, file)], {
-      encoding: "utf8",
-      timeout: 10_000,
-      maxBuffer: 2 * 1024 * 1024,
-    });
-    if (r.error) throw r.error;
-    if (r.status !== 0 && r.status !== 1) throw new Error(`could not render diff for ${file}: ${r.stderr}`);
-    const body = (r.stdout || "").split("\n").slice(2).join("\n").trimEnd();
+    const body = lineDiff(fs.readFileSync(before, "utf8"), fs.readFileSync(after, "utf8"));
     if (body) log(`\nDiff for ${file}:\n${body}`);
   }
 }

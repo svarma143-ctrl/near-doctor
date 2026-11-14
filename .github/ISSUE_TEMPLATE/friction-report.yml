@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         The fastest way: run `npx near-doctor submit --from <saved-output> --command "<what you ran>" --out report.md`.
-        It redacts keys, tokens, emails and home paths locally. Then either paste each section below, or
+        It removes common key and token formats, emails, home paths and your hostname locally (best effort: it cannot catch everything). Then either paste each section below, or
         `gh issue create --label friction --title "[friction] ..." --body-file report.md` (same headings, same triage).
 
         Please re-read everything before posting. Never paste seed phrases or private keys.

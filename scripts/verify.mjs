@@ -122,7 +122,7 @@ const claims = [
     },
   },
   {
-    claim: "`submit` redacts secrets, home paths and emails locally",
+    claim: "`submit` removes the secret formats it knows, home paths and emails locally (best effort)",
     cmd: "near-doctor submit --from <file with a fake key>",
     run: () => {
       const d = fs.mkdtempSync(path.join(tmpBase, "nd-verify-"));
@@ -133,6 +133,35 @@ const claims = [
       fs.rmSync(d, { recursive: true, force: true });
       const leaked = r.out.includes("4".repeat(20)) || r.out.includes(os.homedir()) || r.out.includes("me@example.com");
       return !leaked && /\[REDACTED\]/.test(r.out) ? pass("key, home path and email absent from the report") : fail("something leaked");
+    },
+  },
+  {
+    claim: "`fix --safe` never writes through a symlink: a project whose Cargo.toml links to a file outside it leaves that file unchanged",
+    cmd: "near-doctor fix <project with symlinked Cargo.toml> --safe",
+    run: () => {
+      const base = fs.mkdtempSync(path.join(tmpBase, "nd-verify-"));
+      const proj = path.join(base, "proj");
+      fs.mkdirSync(path.join(proj, "tests"), { recursive: true });
+      fs.mkdirSync(path.join(base, "outside"));
+      const victim = path.join(base, "outside", "victim.toml");
+      const body = '[package]\nname = "x"\nversion = "0.1.0"\n';
+      fs.writeFileSync(victim, body);
+      fs.symlinkSync(victim, path.join(proj, "Cargo.toml"));
+      fs.writeFileSync(path.join(proj, "tests", "t.rs"), "fn f() -> anyhow::Result<()> { Ok(()) }\n");
+      doctor(["fix", proj, "--safe"]);
+      const unchanged = fs.readFileSync(victim, "utf8") === body;
+      // the same guard, exercised directly: refusal reasons
+      const unit = sh("node", ["--test", "test/fix-boundary.test.mjs"]);
+      fs.rmSync(base, { recursive: true, force: true });
+      return unchanged && unit.status === 0 ? pass("linked file unchanged; symlink, ../, absolute-path and hard-link cases refused") : fail(`unchanged=${unchanged}; ${unit.out.slice(-200)}`);
+    },
+  },
+  {
+    claim: "The scanner and the redactor finish quickly on large malformed input (each case is killed after 20 s)",
+    cmd: "node --test --test-name-pattern='stays fast' test/engine.test.mjs test/support.test.mjs",
+    run: () => {
+      const r = sh("node", ["--test", "--test-name-pattern=stays fast", "test/engine.test.mjs", "test/support.test.mjs"]);
+      return r.status === 0 && /ℹ pass 2\b/.test(r.out) ? pass("17 hostile inputs, none slower than the limit") : fail(r.out.slice(-300));
     },
   },
   {

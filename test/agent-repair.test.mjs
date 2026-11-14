@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { agentEnv, buildCodexArgs, extractCodexPatch, makeAgentPrompt, runAcceptance, runRepair } from "../scripts/agent-repair.mjs";
+import { agentEnv, buildCodexArgs, extractCodexPatch, lineDiff, makeAgentPrompt, runAcceptance, runRepair } from "../scripts/agent-repair.mjs";
 
 const ROOT = path.join(import.meta.dirname, "..");
 const DEMO = path.join(ROOT, "demo", "broken-contract");
@@ -115,4 +115,17 @@ test("agent environment is an allowlist: provider settings pass, unrelated secre
   });
   for (const k of ["PATH", "HOME", "LC_ALL", "XDG_CONFIG_HOME", "CODEX_HOME", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "HTTPS_PROXY"]) assert.ok(k in env, `${k} should pass`);
   for (const k of ["GITHUB_TOKEN", "NPM_TOKEN", "AWS_SECRET_ACCESS_KEY", "DATABASE_URL", "SSH_AUTH_SOCK"]) assert.ok(!(k in env), `${k} must not pass`);
+});
+
+test("lineDiff shows the changed lines with context, needs no git, and handles edge cases", () => {
+  const before = ["a", "b", "c", "d", "e", "f", "g", "h"].join("\n");
+  const after = ["a", "b", "c", "D", "e", "f", "g", "h"].join("\n");
+  const d = lineDiff(before, after, 1).split("\n");
+  assert.deepEqual(d, [" c", "-d", "+D", " e"]);
+  assert.equal(lineDiff(before, before), "");
+  assert.match(lineDiff("x\n".repeat(3000), "y\n".repeat(3000)), /too large/);
+  const gap = lineDiff(["1", "2", "3", "4", "5", "6", "7", "8", "9"].join("\n"), ["X", "2", "3", "4", "5", "6", "7", "8", "Y"].join("\n"), 1).split("\n");
+  assert.ok(gap.includes("..."), "distant changes are separated");
+  const rename = lineDiff("fn amount_owed() {}\nfn other() {}", "fn compute_amount_owed() {}\nfn other() {}");
+  assert.match(rename, /-fn amount_owed\(\) \{\}\n\+fn compute_amount_owed\(\) \{\}/);
 });

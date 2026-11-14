@@ -365,3 +365,38 @@ test("F-006: provider.callFunctionRaw and identifiers like DemoFailure are not f
   assert.deepEqual(await ids(make("class DemoFailure extends Error {}\nawait signer.callFunctionRaw({ contractId });"), "F-006"), []);
   assert.deepEqual(await ids(make("const r = await new Account(a, b, c).callFunctionRaw({ contractId });\nif ('Failure' in r.status) {}"), "F-006"), ["F-006"]);
 });
+
+test("scanner stays fast on malformed or hostile Rust and JS input (each case is killed after 20 s)", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const { fileURLToPath } = await import("node:url");
+  const indexUrl = new URL("../src/index.mjs", import.meta.url).href;
+  const manifest = '[package]\nname = "c"\nversion = "0.1.0"\n';
+  const rep = (str, n) => str.repeat(n);
+  const cases = {
+    "many unclosed fn signatures in a #[near] impl": { "Cargo.toml": manifest, "src/lib.rs": "#[near]\nimpl C {\n" + rep("pub fn f(&self, ", 20000) + "\n}" },
+    "many fn tokens with no parentheses": { "Cargo.toml": manifest, "src/lib.rs": "#[near]\nimpl C {\n" + rep("pub fn f ", 40000) },
+    "thousands of pub, mod, impl tokens": { "Cargo.toml": manifest, "src/lib.rs": rep("pub mod m ", 30000) + rep("impl X ", 30000) },
+    "one long line of attributes": { "Cargo.toml": manifest, "src/lib.rs": rep("#[near]", 100000) },
+    "deeply nested parentheses": { "Cargo.toml": manifest, "src/lib.rs": "#[near]\nimpl C {\npub fn f(" + rep("(", 200000) + ")" },
+    "huge import list": { "package.json": "{}", "a.mjs": "import { " + rep("x, ", 150000) + ' } from "near-api-js";\n' },
+    "many callFunctionRaw and Failure": { "package.json": "{}", "a.mjs": 'import "near-api-js";\n' + rep("account.callFunctionRaw(", 20000) + rep("\nFailure ", 20000) },
+    "many max_gas and balance lines": { "Cargo.toml": manifest, "tests/t.rs": rep(".max_gas()\n", 40000) + rep(".balance\n", 40000) },
+    "huge toml and test file": { "Cargo.toml": manifest + rep("anyhow x\n", 80000), "tests/t.rs": rep("anyhow::", 40000) },
+    "shell soup": { "Cargo.toml": manifest, "scripts/deploy.sh": rep("near dev-deploy ", 50000) },
+  };
+  const child = `import { runChecks, loadRules, DEFAULT_RULES_DIR } from ${JSON.stringify(indexUrl)};
+    const t0 = Date.now();
+    await runChecks({ root: process.argv[1], rules: loadRules(DEFAULT_RULES_DIR), mock: { __strict: true } });
+    console.log(Date.now() - t0);`;
+  for (const [name, files] of Object.entries(cases)) {
+    const dir = tmp();
+    for (const [rel, body] of Object.entries(files)) {
+      fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+      fs.writeFileSync(path.join(dir, rel), body);
+    }
+    const r = spawnSync(process.execPath, ["--input-type=module", "-e", child, dir], { encoding: "utf8", timeout: 20000 });
+    assert.ok(!r.error, `${name}: did not finish within 20 s (${r.error?.code})`);
+    assert.equal(r.status, 0, `${name}: ${r.stderr.slice(0, 300)}`);
+    assert.ok(Number(r.stdout.trim()) < 5000, `${name}: ${r.stdout.trim()} ms`);
+  }
+});

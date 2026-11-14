@@ -99,3 +99,68 @@ test("explain never prints blank placeholders, for every rule's repro output", (
     }
   }
 });
+
+test("redact: broader credential formats (best effort)", () => {
+  const cases = {
+    "client_secret": 'client_secret=Zx9Qm2LpWv8Rt4Ys6Hn',
+    "clientSecret json": '{"clientSecret": "Zx9Qm2LpWv8Rt4Ys6Hn"}',
+    "AWS secret": "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYzzzzzzzzzz",
+    "AWS access key id": "id AKIAIOSFODNN7EXAMPLE here",
+    "openssh block": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmU=\nAAAAB3NzaC1lZDI1NTE5AAAAIPlaceholderplaceholder\n-----END OPENSSH PRIVATE KEY-----",
+    "truncated pem": "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEAzzzzzzzzzzzzzzzzzzzzzz",
+    "url credentials": "git clone https://deploy:hunter2secret@github.com/org/repo.git",
+    "hex 64 with 0x": "0x" + "ab12".repeat(16),
+    "hex 64 bare": "key " + "cd34".repeat(16),
+    "hex 128": "sk " + "ef56".repeat(32),
+    "bare base58 key": "key " + "5" + "K".repeat(86) + " end",
+    "jwt": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+    "npm token": "npm_" + "a1B2c3D4".repeat(5),
+    "basic auth": "Authorization: Basic dXNlcjpwYXNzd29yZA==",
+    "db url": "DATABASE_URL=postgres://u:pw1234@db.internal:5432/app",
+    "windows profile": "C:\\Users\\Sarah Jones\\proj",
+  };
+  const needles = {
+    "client_secret": "Zx9Qm2LpWv8Rt4Ys6Hn", "clientSecret json": "Zx9Qm2LpWv8Rt4Ys6Hn", "AWS secret": "wJalrXUtnFEMI", "AWS access key id": "AKIAIOSFODNN7EXAMPLE",
+    "openssh block": "b3BlbnNzaC1rZXktdjEAAAAABG5vbmU", "truncated pem": "MIIEowIBAAKCAQEA", "url credentials": "hunter2secret", "hex 64 with 0x": "ab12ab12", "hex 64 bare": "cd34cd34",
+    "hex 128": "ef56ef56", "bare base58 key": "KKKKKKKKKK", "jwt": "eyJzdWIi", "npm token": "a1B2c3D4a1B2", "basic auth": "dXNlcjpwYXNzd29yZA", "db url": "pw1234", "windows profile": "Sarah",
+  };
+  for (const [name, text] of Object.entries(cases)) {
+    const out = redact(text, { home: "/nonexistent-home", hostname: "" });
+    assert.ok(!out.includes(needles[name]), `${name} leaked: ${out}`);
+  }
+  // the redacted URL keeps the host and user so the report still says what failed
+  assert.match(redact("https://deploy:hunter2secret@github.com/o/r.git", { hostname: "" }), /https:\/\/deploy:\[REDACTED\]@github\.com/);
+  // public identifiers are still kept
+  const pub = redact("alice.testnet 5wQgycq3qknFDpH2VHcmHDJ6JVEXrZ6Ba6PiAZBRXSXW cargo-near 0.23.0", { hostname: "" });
+  assert.match(pub, /alice\.testnet 5wQgycq3qknFDpH2VHcmHDJ6JVEXrZ6Ba6PiAZBRXSXW cargo-near 0\.23\.0/);
+  // the hostname is replaced
+  assert.equal(redact("on MyBox-3.local failed", { home: "/nonexistent-home", hostname: "MyBox-3.local" }), "on <host> failed");
+  // redaction is idempotent
+  const once = redact("password=hunter2 and Bearer abcdefghijklmnop", { hostname: "" });
+  assert.equal(redact(once, { hostname: "" }), once);
+});
+
+test("redact stays fast on large hostile-looking input (each case is killed after 20 s)", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const redactUrl = new URL("../src/redact.mjs", import.meta.url).href;
+  const inputs = [
+    'process.argv[1] = "a".repeat(1_000_000)',
+    '"secret".repeat(100_000)',
+    '("key=" + "x".repeat(1000) + "\\n").repeat(1000)',
+    '"-----BEGIN PRIVATE KEY-----" + "A".repeat(500_000)',
+    '("1".repeat(80) + " ").repeat(5000)',
+    '"https://" + "u".repeat(5000) + ":" + "p".repeat(5000)',
+    '"x".repeat(60) + "@" + "y".repeat(500_000)',
+  ].map((e) => e.replace('process.argv[1] = ', ""));
+  for (const expr of inputs) {
+    const code = `import { redact } from ${JSON.stringify(redactUrl)};
+      const text = ${expr};
+      const t0 = Date.now();
+      redact(text, { home: "/nonexistent-home", hostname: "" });
+      console.log(Date.now() - t0);`;
+    const r = spawnSync(process.execPath, ["--input-type=module", "-e", code], { encoding: "utf8", timeout: 20000 });
+    assert.ok(!r.error, `${expr}: did not finish within 20 s (${r.error?.code})`);
+    assert.equal(r.status, 0, r.stderr.slice(0, 300));
+    assert.ok(Number(r.stdout.trim()) < 2000, `${expr}: ${r.stdout.trim()} ms`);
+  }
+});

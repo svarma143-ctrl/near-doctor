@@ -8,7 +8,7 @@ allowlisted types in `src/rules.mjs`.
 
 1. Save the output of the failing command to a file.
 2. `npx near-doctor submit --from out.txt --command "<what you ran>" --out report.md`
-   (secrets, home paths and emails are redacted locally; re-read before posting).
+   (common secret formats, home paths, emails and the hostname are removed locally, best effort: it can miss formats it does not know, for example an unlabelled seed phrase; always re-read before posting).
 3. Open a "Friction report" issue (or `gh issue create --label friction --body-file report.md`).
 4. A triage action replies with the matching rule, or attaches a draft rule. A maintainer reproduces it.
 
