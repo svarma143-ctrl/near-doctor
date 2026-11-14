@@ -12,6 +12,35 @@ hands everything else to your coding agent as a precise task with a command that
 Status: hackathon prototype (NEAR HACKATHON, Open Innovation track), version 0.1.0. Tested on macOS 15 arm64 only.
 See [Limitations](#limitations).
 
+## For judges: two minutes
+
+**What it is:** developer tooling, not a contract. `near-doctor` scans a NEAR project for known, reproduced problems,
+explains pasted error output, applies a few safe fixes, and hands the rest to a coding agent as a task plus a command
+that proves it is fixed. Track: Open Innovation.
+
+**The problem:** a contract can pass `cargo test` and still fail the wasm build (F-001, reproduced here, see
+[cargo-near#439](https://github.com/near/cargo-near/issues/439)); tutorials and assistants call CLI commands that no longer
+exist (F-008) or near-api-js 0.x APIs that v7 removed (F-007); clippy fails on code the `#[near]` macro generates (F-004).
+
+**The NEAR part:** it wraps `cargo near check`, and its rules and evidence come from running the NEAR toolchain
+(near-sdk 5.30, cargo-near 0.23, near-api-js 7.5, near-cli 4.0.13, testnet). The demo ends with the real `cargo near check`
+passing. It holds no keys and sends no transactions.
+
+Do this, see that:
+
+1. Watch [docs/demo.mp4](docs/demo.mp4) (54 s). You see a contract whose unit tests pass, four problems found, two fixed by
+   the tool, two by agent edits (from a stored patch; the video says so), then `cargo near check` passing.
+2. `git clone https://github.com/svarma143-ctrl/near-doctor && cd near-doctor && node scripts/demo.mjs`. You see
+   `DEMO OK`. It needs only Node 20+; if cargo-near is installed it also runs the real `cargo near check` and `cargo test`.
+3. `npm run verify`. You see one PASS or FAIL line for each claim in this README, with the command behind it.
+4. `node bin/near-doctor.mjs show F-001`. You see the evidence record: what was reproduced, on which versions, and how.
+5. Open [docs/STUDY.md](docs/STUDY.md). You see what the rules found in 150 public hackathon repos, and the four rules that
+   had false positives and were fixed.
+
+**What is not done:** it is not an autonomous fixing platform. The agent loop ([below](#agent-repair-harness-proof-of-concept-one-rule))
+is a harness for one rule and has no recorded live run yet. Everything was verified on one machine (macOS arm64). See
+[Limitations](#limitations) and the [roadmap](#where-this-goes).
+
 ## Use it on your project
 
 ```bash
@@ -65,8 +94,8 @@ node bin/near-doctor.mjs . --net                       # also measures your publ
 | `near-doctor show F-001` | The full record for one friction entry: summary, evidence, fix steps, fixtures. |
 | `near-doctor --deep` | Also runs the real `cargo near check` and explains its output. |
 | `near-doctor explain --from FILE` | Paste output (or `--from -`); get the known cause and fix, including the real error buried in long dumps. |
-| `near-doctor fix --safe` | Applies deterministic, allowlisted fixes, then re-checks. `--dry-run` previews. |
-| `near-doctor submit` | Builds a redacted friction report (secrets, home paths, emails stripped locally) for a GitHub issue. |
+| `near-doctor fix --safe` | Applies deterministic, allowlisted fixes, then re-checks. `--dry-run` previews. It refuses to write through symlinks or hard links, or to any path outside the project. |
+| `near-doctor submit` | Builds a friction report for a GitHub issue. Common secret formats, home paths, emails and your hostname are removed locally. This is best-effort: read the report before you post it. |
 | `near-doctor inspect X.wasm` | Shows wasm sections and target features. |
 | `near-doctor rules [--markdown\|--json\|--check]` | The friction log; `--check` validates rules and fixtures. |
 
@@ -139,6 +168,14 @@ near-doctor adds executable checks, a verified rule database and a contribution 
 - **Precision is sampled, not measured.** False positives were hunted by reading flagged source in public repos (see
   [docs/STUDY.md](docs/STUDY.md)). F-005 is a pattern match (`info`), and about a quarter of F-006 hits have the
   `Failure` check far from the call.
+- **Redaction is best-effort.** `submit` and the triage script remove common key, token and credential formats, URL
+  passwords, private-key blocks, emails, home paths and the hostname. They cannot recognise every secret: an unlabelled
+  seed phrase is not detected, and any 64 or 128 hex characters are hidden, which also hides some hashes. Read a report
+  before you post it.
+- **Custom rule packs are trusted input.** `--rules DIR` loads rules whose regexes are only checked for validity, not for
+  cost, so an untrusted pack could contain a slow pattern. Only load packs you trust. The scanner and the redactor are tested
+  against large malformed inputs (about a million characters, unbalanced brackets, thousands of repeated tokens) and finish
+  in seconds; that testing found and fixed two quadratic cases.
 - **"Agents fix" is limited.** Three allowlisted autofixes plus agent-ready tasks. LLM-drafted rules are not
   implemented; the triage script drafts rules deterministically from the first error line.
 - **CI and triage have each run on GitHub.** CI is green on Node 20 and 22. The triage workflow matched a test issue to F-012 and replied (one test issue, with real rustc output). Neither has had sustained use.
@@ -146,6 +183,28 @@ near-doctor adds executable checks, a verified rule database and a contribution 
 - **The npm package ships code and rules only** (no fixtures, demo or tests). `rules --check` therefore validates the rule schema only, and the demo needs the git clone.
 - `explain` knows 6 error signatures. Unknown output returns exit 1 and suggests `submit`.
 - Telemetry: none. Network: none unless you pass `--net`.
+
+## Where this goes
+
+The aim is the experience of `flutter doctor`: one command that says what is wrong with a NEAR project and how to fix it,
+kept current by the people who hit the problems. Today it covers 18 recorded frictions, not everything.
+
+How a report is meant to become a fix for the next developer: a developer hits a failure and runs `near-doctor submit`;
+the triage workflow matches it to a known record or drafts a rule; a maintainer reproduces it and adds a failing example
+plus a clean control; CI accepts the rule only if both behave; the next release catches it for everyone, and coding agents
+get a task and an acceptance command for it. Maintainers stay in the loop on purpose: an unreproduced report never becomes a warning.
+
+| Phase | Status |
+| --- | --- |
+| 1. Trusted local doctor: fast scan, evidence tiers, fixture-gated rules | **Built** (CLI, 18 records, CI, npm) |
+| 2. Verified agent repairs: finding to patch to acceptance check, with approval | **Started** (harness for one rule; next: more rules, recorded live runs, an approval step, branch mode) |
+| 3. Community intake: a stable report format, de-duplication, reproduction queue | **Partly built** (issue form and triage workflow work; the report format is not versioned yet) |
+| 4. Versioned rule packs with provenance and staleness marks | Not built |
+| 5. Other chains and toolchains | Only after phases 1 to 4 show value |
+
+Success should be measured, not asserted: false-positive rate per rule, how often a finding leads to a passing check, and
+how long it takes from first failure to green. The current numbers (a hand-audited sample from public repos) are in
+[docs/STUDY.md](docs/STUDY.md).
 
 ## Hackathon notes
 
@@ -199,7 +258,7 @@ unproven until one is added. Requires Node 20+ and a logged-in agent CLI (plus R
 
 ```bash
 npm test                                   # tests (1 real-toolchain test is skipped unless NEAR_DOCTOR_SLOW=1), including the fixture gate
-npm run verify                             # checks each README claim: 13 PASS lines with the command behind each
+npm run verify                             # checks each README claim: one PASS or FAIL line per claim, with the command behind it
 npm run test:slow                          # real toolchain end to end (needs cargo + cargo-near)
 npm run log                                # regenerate docs/FRICTION_LOG.md
 node bin/near-doctor.mjs . --fail-on warn  # near-doctor scans itself (fixtures, rules and docs are ignored)
