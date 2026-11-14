@@ -1,6 +1,6 @@
 {
   "name": "near-doctor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Preflight checks and an evidence-backed friction log for NEAR developers and their coding agents",
   "license": "MIT",
   "type": "module",

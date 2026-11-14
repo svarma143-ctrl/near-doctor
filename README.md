@@ -9,7 +9,7 @@ wasm build, a script that calls a CLI command that no longer exists, a client wr
 `near-doctor` scans a project for these in under a second, explains pasted error output, applies the safe fixes, and
 hands everything else to your coding agent as a precise task with a command that proves it worked.
 
-Status: hackathon prototype (NEAR HACKATHON, Open Innovation track), version 0.1.0. Tested on macOS 15 arm64 only.
+Status: hackathon prototype (NEAR HACKATHON, Open Innovation track), version 0.1.1. Tested on macOS 15 arm64 only.
 See [Limitations](#limitations).
 
 ## For judges: two minutes
