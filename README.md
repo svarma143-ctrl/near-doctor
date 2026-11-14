@@ -162,10 +162,43 @@ near-doctor adds executable checks, a verified rule database and a contribution 
   before the first push to replace the author email, so the earliest commits share a rewrite timestamp.
 - **What is not done:** see [Limitations](#limitations).
 
+## Agent repair harness (proof of concept, one rule)
+
+`scripts/agent-repair.mjs` hands one finding (F-001) to a coding agent and checks the result with near-doctor and cargo
+instead of trusting the agent. It lives in the git repository, not in the npm package.
+
+```bash
+git clone https://github.com/svarma143-ctrl/near-doctor && cd near-doctor
+node scripts/agent-repair.mjs                 # Codex CLI (default), in a temporary copy of the demo contract
+node scripts/agent-repair.mjs --agent claude  # Claude Code instead
+node scripts/agent-repair.mjs --no-cargo      # skip the cargo checks
+node scripts/agent-repair.mjs --keep          # keep the temporary copy to review
+```
+
+What it does: copies `demo/broken-contract` to a temp directory, confirms F-001 reproduces there, gives the agent the
+finding and `src/lib.rs`, shows the resulting diff, and accepts it only if (1) no file other than `src/lib.rs` changed,
+(2) near-doctor no longer reports F-001, and (3) unless `--no-cargo`, `cargo near check` and `cargo test --lib` pass.
+(`cargo test --lib` and not `cargo test`, because the full demo has a separate F-012 test-dependency finding that this
+repair does not address.) Your own project and the checked-in demo are never modified.
+
+What is enforced, and what is not:
+
+- **Enforced by the harness:** the file allowlist, a refusal to follow symlinks in the workspace, success judged by
+  near-doctor and cargo and never by the agent's own claim, and an allowlisted environment (7 of 91 variables on the
+  author's machine; unrelated tokens such as `GITHUB_TOKEN` and `NPM_TOKEN` are not forwarded).
+- **Not enforced:** where the agent can *read*. Codex's read-only sandbox blocks writes, not reads, and "stay in the
+  working directory" is an instruction in the prompt, not a boundary. Use an agent login you trust.
+- **Cost:** a run uses your agent account's quota and sends the demo contract's source to that provider.
+
+Status: the harness, the diff filter, the acceptance check and the environment filter are covered by tests that use a
+mock agent. **A transcript of a live-agent run is not included in this repository yet**, so treat the live path as
+unproven until one is added. Requires Node 20+ and a logged-in agent CLI (plus Rust and `cargo-near` unless
+`--no-cargo`). It is one rule, not a general autonomous fixer.
+
 ## Development
 
 ```bash
-npm test                                   # 84 tests (1 slow end-to-end test is skipped unless NEAR_DOCTOR_SLOW=1), including the fixture gate
+npm test                                   # tests (1 real-toolchain test is skipped unless NEAR_DOCTOR_SLOW=1), including the fixture gate
 npm run verify                             # checks each README claim: 13 PASS lines with the command behind each
 npm run test:slow                          # real toolchain end to end (needs cargo + cargo-near)
 npm run log                                # regenerate docs/FRICTION_LOG.md

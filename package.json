@@ -38,6 +38,7 @@
     "test": "node --test",
     "verify": "node scripts/verify.mjs",
     "test:slow": "NEAR_DOCTOR_SLOW=1 node --test test/slow.test.mjs",
+    "agent:repair": "node scripts/agent-repair.mjs",
     "doctor": "node bin/near-doctor.mjs",
     "log": "node scripts/gen-log.mjs",
     "log:check": "node scripts/gen-log.mjs --check",
