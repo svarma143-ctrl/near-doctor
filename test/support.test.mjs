@@ -157,10 +157,11 @@ test("redact stays fast on large hostile-looking input (each case is killed afte
       const text = ${expr};
       const t0 = Date.now();
       redact(text, { home: "/nonexistent-home", hostname: "" });
-      console.log(Date.now() - t0);`;
+      process.stdout.write(String(Date.now() - t0));`;
     const r = spawnSync(process.execPath, ["--input-type=module", "-e", code], { encoding: "utf8", timeout: 20000 });
     assert.ok(!r.error, `${expr}: did not finish within 20 s (${r.error?.code})`);
     assert.equal(r.status, 0, r.stderr.slice(0, 300));
-    assert.ok(Number(r.stdout.trim()) < 2000, `${expr}: ${r.stdout.trim()} ms`);
+    const ms = Number(r.stdout.replace(/\x1b\[[0-9;]*m/g, "").trim());
+    assert.ok(ms < 2000, `${expr}: ${ms} ms`);
   }
 });

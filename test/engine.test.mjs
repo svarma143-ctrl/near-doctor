@@ -387,7 +387,7 @@ test("scanner stays fast on malformed or hostile Rust and JS input (each case is
   const child = `import { runChecks, loadRules, DEFAULT_RULES_DIR } from ${JSON.stringify(indexUrl)};
     const t0 = Date.now();
     await runChecks({ root: process.argv[1], rules: loadRules(DEFAULT_RULES_DIR), mock: { __strict: true } });
-    console.log(Date.now() - t0);`;
+    process.stdout.write(String(Date.now() - t0));`;
   for (const [name, files] of Object.entries(cases)) {
     const dir = tmp();
     for (const [rel, body] of Object.entries(files)) {
@@ -397,6 +397,8 @@ test("scanner stays fast on malformed or hostile Rust and JS input (each case is
     const r = spawnSync(process.execPath, ["--input-type=module", "-e", child, dir], { encoding: "utf8", timeout: 20000 });
     assert.ok(!r.error, `${name}: did not finish within 20 s (${r.error?.code})`);
     assert.equal(r.status, 0, `${name}: ${r.stderr.slice(0, 300)}`);
-    assert.ok(Number(r.stdout.trim()) < 5000, `${name}: ${r.stdout.trim()} ms`);
+    // node --test turns colour on inside a terminal; never parse coloured output
+    const ms = Number(r.stdout.replace(/\x1b\[[0-9;]*m/g, "").trim());
+    assert.ok(ms < 5000, `${name}: ${ms} ms`);
   }
 });
